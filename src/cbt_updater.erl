@@ -114,5 +114,3 @@ init_db(DbPid, Fd, Header, Dir, BtreeSpecs, Options) ->
         _ ->
             {error, database_disk_version_error}
     end.
-
-

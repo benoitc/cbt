@@ -5,10 +5,13 @@
          open_link/2, open_link/3, open_link/4,
          close/1]).
 
+-export([transact/2, transact/3, transact/4]).
+
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          code_change/3, terminate/2]).
 
 -export([start_app/0]).
+-export([get_updater/1]).
 
 -include("cbt.hrl").
 
@@ -18,6 +21,7 @@
 -define(log(Fmt,Args),ok).
 -endif.
 
+-define(DEFAULT_TIMEOUT, 15000).
 
 %% PUBLIC API
 %%
@@ -108,6 +112,33 @@ close(Ref) ->
     end.
 
 
+transact(Ref, TransactFun) ->
+    transact(Ref, TransactFun, []).
+
+transact(Ref, TransactFun, Args) ->
+    transact(Ref, TransactFun, Args, ?DEFAULT_TIMEOUT).
+
+transact(Ref, TransactFun, Args, Timeout) ->
+    {ok, UpdaterPid} = get_updater(Ref),
+    Tag = erlang:monitor(process, UpdaterPid),
+    UpdaterPid ! {transact, TransactFun, Args, self(), Tag},
+
+    catch erlang:send(UpdaterPid, {transact, TransactFun, Args, self(), Tag},
+                      [noconnect]),
+    receive
+        {Tag, Resp} -> Resp;
+        {'DOWN', Tag, _, _, _} -> {error, updater_exited}
+    after Timeout ->
+        erlang:demonitor(Tag, [flush]),
+        {error, timeout}
+    end.
+
+
+%% @doc get updater pid
+get_updater(Ref) ->
+    gen_server:call(Ref, get_updater, infinity).
+
+
 %% gen_server api
 %%
 %%
@@ -130,6 +161,9 @@ handle_call(get_db, _From, Db) ->
 
 handle_call({db_updated, Db}, _From, _OldDb) ->
     {reply, ok, Db};
+
+handle_call(get_updater, _From, #db{updater_pid=UpdaterPid}=Db) ->
+    {reply, {ok, UpdaterPid}, Db};
 
 handle_call(close, _From, Db) ->
     {stop, normal, ok, Db}.
@@ -176,6 +210,7 @@ terminate(_Reason, #db{fd=Fd, updater_pid=UpdaterPid}) ->
     ok = cbt_updater:stop(UpdaterPid),
     cbt_file:close(Fd),
     ok.
+
 
 %% UTILS fonctions
 start_app() ->
