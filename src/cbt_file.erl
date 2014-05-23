@@ -205,8 +205,13 @@ sync(Fd) ->
 %% Returns: ok
 %%----------------------------------------------------------------------
 close(Fd) ->
-    gen_server:call(Fd, close, infinity).
-
+    try
+        gen_server:call(Fd, close, infinity)
+    catch
+        exit:{noproc, _} -> ok;
+        exit:noproc -> ok;
+        exit:{normal, _} -> ok
+    end.
 
 delete(RootDir, Filepath) ->
     delete(RootDir, Filepath, true).
@@ -334,6 +339,7 @@ file_open_options(Options) ->
 terminate(_Reason, #file{fd = nil}) ->
     ok;
 terminate(_Reason, #file{fd = Fd}) ->
+
     ok = file:close(Fd).
 
 handle_call(close, _From, #file{fd=Fd}=File) ->

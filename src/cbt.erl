@@ -5,7 +5,17 @@
          open_link/2, open_link/3, open_link/4,
          close/1]).
 
--export([transact/2, transact/3, transact/4]).
+-export([transact/2, transact/3]).
+-export([add/2,
+         add_remove/3,
+         query_modify/4,
+         lookup/2,
+         fold/3, fold/4,
+         size/1,
+         full_reduce/1,
+         final_reduce/2,
+         fold_reduce/4]).
+
 
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
          code_change/3, terminate/2]).
@@ -22,6 +32,8 @@
 -endif.
 
 -define(DEFAULT_TIMEOUT, 15000).
+
+
 
 %% PUBLIC API
 %%
@@ -116,22 +128,81 @@ transact(Ref, TransactFun) ->
     transact(Ref, TransactFun, []).
 
 transact(Ref, TransactFun, Args) ->
-    transact(Ref, TransactFun, Args, ?DEFAULT_TIMEOUT).
-
-transact(Ref, TransactFun, Args, Timeout) ->
     {ok, UpdaterPid} = get_updater(Ref),
     Tag = erlang:monitor(process, UpdaterPid),
     UpdaterPid ! {transact, TransactFun, Args, self(), Tag},
 
-    catch erlang:send(UpdaterPid, {transact, TransactFun, Args, self(), Tag},
+    try
+        erlang:send(UpdaterPid, {transact, TransactFun, Args, self(), Tag},
                       [noconnect]),
-    receive
-        {Tag, Resp} -> Resp;
-        {'DOWN', Tag, _, _, _} -> {error, updater_exited}
-    after Timeout ->
-        erlang:demonitor(Tag, [flush]),
-        {error, timeout}
+        receive
+            {Tag, Resp} ->
+                Resp;
+            {'DOWN', Tag, _, _, Reason} ->
+                error_logger:error_msg("updater pid exited with reason ~p~n",
+                                       [Reason]),
+
+                {error, updater_exited, Reason}
+        end
+
+    after
+        erlang:demonitor(Tag, [flush])
     end.
+
+
+
+add(BtName, InsertKeyValues) ->
+    add_remove(BtName, InsertKeyValues, []).
+
+add_remove(BtName, InsertKeyValues, RemoveKeys) ->
+    {ok, []} = query_modify(BtName, [], InsertKeyValues, RemoveKeys),
+    ok.
+
+query_modify(BtName, LookupKeys, InsertValues, RemoveKeys) ->
+    if_trans(BtName, fun(Btree, Db) ->
+                {ok, QueryResults, Btree2} = cbt_btree:query_modify(
+                        Btree, LookupKeys, InsertValues, RemoveKeys),
+                NewDb = set_btree(BtName, Btree2, Db),
+                erlang:put(cbt_trans, NewDb),
+                {ok, QueryResults}
+        end).
+
+
+lookup(BtName, Keys) ->
+    if_trans(BtName, fun(Btree, _Db) ->
+                cbt_btree:lookup(Btree, Keys)
+        end).
+
+
+fold(BtName, Fun, Acc) ->
+    fold(BtName, Fun, Acc, []).
+
+fold(BtName, Fun, Acc, Options) ->
+    if_trans(BtName, fun(Btree, _Db) ->
+                cbt_btree:fold(Btree, Fun, Acc, Options)
+        end).
+
+size(BtName) ->
+    if_trans(BtName, fun(Btree, _Db) ->
+                cbt_btree:size(Btree)
+        end).
+
+final_reduce(BtName, Val) ->
+    if_trans(BtName, fun(Btree, _Db) ->
+                cbt_btree:final_reduce(Btree, Val)
+        end).
+
+
+fold_reduce(BtName, Fun, Acc, Options) ->
+    if_trans(BtName, fun(Btree, _Db) ->
+                cbt_btree:fold_reduce(Btree, Fun, Acc, Options)
+        end).
+
+
+full_reduce(BtName) ->
+    if_trans(BtName, fun(Btree, _Db) ->
+                cbt_btree:full_reduce(Btree)
+        end).
 
 
 %% @doc get updater pid
@@ -207,8 +278,9 @@ code_change(_OldVsn, State, _Extra) ->
     {ok, State}.
 
 terminate(_Reason, #db{fd=Fd, updater_pid=UpdaterPid}) ->
-    ok = cbt_updater:stop(UpdaterPid),
-    cbt_file:close(Fd),
+    ok =  cbt_updater:stop(UpdaterPid),
+    ok =  cbt_file:close(Fd),
+
     ok.
 
 
@@ -216,3 +288,31 @@ terminate(_Reason, #db{fd=Fd, updater_pid=UpdaterPid}) ->
 start_app() ->
     {ok, _} = cbt_util:ensure_all_started(cbt),
     ok.
+
+
+%% transaction utilities
+get_btree(Name, #db{btrees=Btrees}) ->
+    case proplists:get_value(Name, Btrees) of
+        undefined ->
+            false;
+        Btree ->
+            Btree
+    end.
+
+set_btree(Name, Btree, #db{btrees=Btrees}=Db) ->
+    Btrees2 = lists:keyreplace(Name, 1, Btrees, {Name, Btree}),
+    Db#db{btrees=Btrees2}.
+
+
+if_trans(BtName, Fun) ->
+    case cbt_updater:if_transaction() of
+        {true, Db} ->
+            case get_btree(BtName, Db) of
+                false ->
+                    unknown_btree;
+                Btree ->
+                    Fun(Btree, Db)
+            end;
+        _ ->
+            no_transaction
+    end.
