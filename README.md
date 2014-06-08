@@ -1,6 +1,6 @@
 #cbt
 
-multi-layer MVCC log append-only database based on the Apache CouchDB btree.
+multi-layer MVCC log append-only database library based on the Apache CouchDB btree.
 
 ## Changes compared to couchdb
 
