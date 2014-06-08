@@ -2,6 +2,52 @@
 
 multi-layer MVCC log append-only database based on the Apache CouchDB btree.
 
+## Changes compared to couchdb
+
+- use CRC32 to check data integrity instead of MD5
+- rewrote the file init part to make it more robust
+- removed the need of an external config. Provides correct default and use erlang environment.
+- documentation and specs
+- some syntax improvements.
+
+## build
+
+### 1. install rebar
+To build cbt you need to install rebar in your `PATH`. Rebar is
+available on Github:
+
+https://github.com/rebar/rebar
+
+Follow the
+[README](https://github.com/rebar/rebar/blob/master/README.md) to
+install it.
+
+### 2. build
+
+Fetch the source code:
+
+    $ git clone git@bitbucket.org:refugeio/cbt.git
+
+Build the source, run the `make` command. It will fetch any needed
+dependencies.
+
+    $ cd /<PATH_TO>/cbt
+    $ make
+
+### 3. test CBT
+
+Run the following command line:
+
+    $ make test
+
+
+### 3. Build the doc
+
+    $ make doc
+
+and open the `index.html` file in the doc folder. Or read it
+[online](http://refugeio.bitbucket.org/cbt/index.html).
+
 ## Example of usage:
 
 Example of usage:
@@ -65,45 +111,6 @@ header:
     ok
     18> cbt_btree:lookup(SnapshotBtree, [a, b]).
     [{ok,{a,1}},not_found]
-
-## build
-
-### 1. install rebar
-To build cbt you need to install rebar in your `PATH`. Rebar is
-available on Github:
-
-https://github.com/rebar/rebar
-
-Follow the
-[README](https://github.com/rebar/rebar/blob/master/README.md) to
-install it.
-
-### 2. build
-
-Fetch the source code:
-
-    $ git clone git@bitbucket.org:refugeio/cbt.git
-
-Build the source, run the `make` command. It will fetch any needed
-dependencies.
-
-    $ cd /<PATH_TO>/cbt
-    $ make
-
-### 3. test CBT
-
-Run the following command line:
-
-    $ make test
-
-
-### 3. Build the doc
-
-    $ make doc
-
-and open the `index.html` file in the doc folder. Or read it
-[online](http://refugeio.bitbucket.org/cbt/index.html).
-
 
 ## contribute
 
