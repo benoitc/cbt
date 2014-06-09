@@ -22,9 +22,6 @@
         byte_size(?term_to_bin(T))
     end).
 
-
--define(LATEST_DISK_VERSION, 1).
-
 -record(btree, {
     fd,
     root,
@@ -35,19 +32,3 @@
     compression = ?DEFAULT_COMPRESSION,
     chunk_threshold = 16#4ff
 }).
-
-
--record(db_header, {version = ?LATEST_DISK_VERSION,
-                    changes = 0,
-                    btrees = [],
-                    meta = []}).
-
--record(db, {db_pid,
-             updater_pid,
-             fd,
-             btrees = [],
-             header,
-             dir,
-             btree_specs = [],
-             options,
-             fsync_options}).
