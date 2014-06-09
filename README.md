@@ -54,7 +54,7 @@ Example of usage:
 
 Store a {Key Value} pair in a btree:
 
-    1> {ok, Fd} = cbt_file:open("test.db").   
+    1> {ok, Fd} = cbt_file:open("test.db", [create_if_missing]).   
     {ok,<0.35.0>}
     2> {ok, Btree} = cbt_btree:new(Fd).
     {ok,{btree,<0.35.0>,nil,undefined,undefined,undefined,nil,
