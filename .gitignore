@@ -1,6 +1,7 @@
 ebin
 *.swp
 *.dump
+*.dat
 edoc-info
 .DS_Store
 deps/

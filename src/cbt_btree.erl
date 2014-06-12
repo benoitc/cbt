@@ -28,6 +28,7 @@
 -define(CHUNK_THRESHOLD, 16#4ff).
 
 -type cbtree() :: #btree{}.
+-type cbtree_root() :: {integer(), list(), integer()}.
 -type cbtree_options() :: [{split, fun()} | {join, fun()} | {less, fun()}
                         | {reduce, fun()}
                         | {compression, cbt_compress:compression_method()}
@@ -42,6 +43,7 @@
                              {key_group_fun, fun()}].
 
 -export_type([cbtree/0]).
+-export_type([cbtree_root/0]).
 -export_type([cbtree_options/0]).
 -export_type([cbt_kv/0, cbt_kvs/0]).
 -export_type([cbt_keys/0]).
