@@ -1,4 +1,4 @@
-title cbt - couchdb btree library 
+title cbt - couchdb btree library
 @author Benoit Chesnewu <benoitc@refuge.io>
   [http://refuge.io/]
 @copyright 2014 Benoit Chesneau (Apache 2 License)
@@ -28,6 +28,11 @@ with the cbt_file module.
         module to store a large binary (stream) in the database file and
 get the list of each chunk.
     </dd>
+
+    <dt>{@link cbt_btree_copy}</dt>
+    <dd>
+        module to store a btree to another.
+    </dd>
 </dl>
 
 
@@ -36,12 +41,12 @@ Example of usage:
 Store a {Key Value} pair in a btree:
 
 ```
-1> {ok, Fd} = cbt_file:open("test.db").   
+1> {ok, Fd} = cbt_file:open("test.db").
 {ok,<0.35.0>}
 2> {ok, Btree} = cbt_btree:new(Fd).
 {ok,{btree,<0.35.0>,nil,undefined,undefined,undefined,nil,
            snappy,1279}}
-3> 
+3>
 3> {ok, Btree2} = cbt_btree:add(Btree, [{a, 1}]).
 {ok,{btree,<0.35.0>,
            {0,[],32},
@@ -61,15 +66,15 @@ Now open the database in a new process and read the btree using the last
 header:
 
 ```
-7> {ok, Fd1} = cbt_file:open("test.db"). 
+7> {ok, Fd1} = cbt_file:open("test.db").
 {ok,<0.44.0>}
-8> 
+8>
 8> {ok, Header1} = cbt_file:read_header(Fd1).
 {ok,{1,{0,[],32}}}
-9> Header1 == Header 
+9> Header1 == Header
 9> .
 true
-10> {_, ReaderRoot} = Header1.   
+10> {_, ReaderRoot} = Header1.
 {1,{0,[],32}}
 11> {ok, SnapshotBtree} = cbt_btree:open(ReaderRoot, Fd1).
 {ok,{btree,<0.44.0>,
