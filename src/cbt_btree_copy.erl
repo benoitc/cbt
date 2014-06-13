@@ -76,21 +76,21 @@ apply_options([{compression, Comp} | Rest], Acc) ->
     apply_options(Rest, Acc#acc{compression = Comp}).
 
 
-extract(#acc{btree = #btree{extract_kv = undefined}}, Value) ->
+extract(#acc{btree = #btree{extract_kv = identity}}, Value) ->
     Value;
 extract(#acc{btree = #btree{extract_kv = Extract}}, Value) ->
     Extract(Value).
 
-assemble(#acc{btree = #btree{assemble_kv = undefined}}, Key, Value) ->
-    {Key, Value};
-assemble(#acc{btree = #btree{assemble_kv = Assemble}}, Key, Value) ->
-    Assemble(Key, Value).
+assemble(#acc{btree = #btree{assemble_kv = identity}}, KeyValue) ->
+    KeyValue;
+assemble(#acc{btree = #btree{assemble_kv = Assemble}}, KeyValue) ->
+    Assemble(KeyValue).
 
 
 before_leaf_write(#acc{before_kv_write = {Fun, UserAcc0}} = Acc, KVs) ->
     {NewKVs, NewUserAcc} = lists:mapfoldl(
-        fun({K, V}, UAcc) ->
-            Item = assemble(Acc, K, V),
+        fun({K, _V}=KV, UAcc) ->
+            Item = assemble(Acc, KV),
             {NewItem, UAcc2} = Fun(Item, UAcc),
             {K, _NewValue} = NewKV = extract(Acc, NewItem),
             {NewKV, UAcc2}
@@ -210,12 +210,15 @@ finish_copy(#acc{cur_level = Level, nodes = Nodes} = Acc) ->
 flush_leaf(KVs, #acc{btree = Btree} = Acc) ->
     {NewKVs, Acc2} = before_leaf_write(Acc, lists:reverse(KVs)),
     Red = case Btree#btree.reduce of
-    nil -> [];
-    _ ->
-        Items = lists:map(
-            fun({K, V}) -> assemble(Acc2, K, V) end,
-            NewKVs),
-        cbt_btree:final_reduce(Btree, {Items, []})
+        nil -> [];
+        _ ->
+            Items = case Btree#btree.assemble_kv of
+                identity ->
+                    NewKVs;
+                _ ->
+                    [assemble(Acc2, Kv) || Kv <- NewKVs]
+            end,
+            cbt_btree:final_reduce(Btree, {Items, []})
     end,
     {ok, LeafState} = write_leaf(Acc2, {kv_node, NewKVs}, Red),
     {LeafState, Acc2}.

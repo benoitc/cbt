@@ -25,9 +25,9 @@
 -record(btree, {
     fd,
     root,
-    extract_kv,
-    assemble_kv,
-    less,
+    extract_kv = identity,  % fun({_Key, _Value} = KV) -> KV end,,
+    assemble_kv =  identity, % fun({Key, Value}) -> {Key, Value} end,
+    less = fun(A, B) -> A < B end,
     reduce = nil,
     compression = ?DEFAULT_COMPRESSION,
     chunk_threshold = 16#4ff

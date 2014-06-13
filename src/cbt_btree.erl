@@ -274,16 +274,15 @@ full_reduce(#btree{root=Root}) ->
     {ok, element(2, Root)}.
 
 
-
-extract(#btree{extract_kv=undefined}, Value) ->
+extract(#btree{extract_kv=identity}, Value) ->
     Value;
 extract(#btree{extract_kv=Extract}, Value) ->
     Extract(Value).
 
-assemble(#btree{assemble_kv=undefined}, Key, Value) ->
-    {Key, Value};
-assemble(#btree{assemble_kv=Assemble}, Key, Value) ->
-    Assemble(Key, Value).
+assemble(#btree{assemble_kv=identity}, KeyValue) ->
+    KeyValue;
+assemble(#btree{assemble_kv=Assemble}, KeyValue) ->
+    Assemble(KeyValue).
 
 
 less(#btree{less=undefined}, A, B) ->
@@ -368,7 +367,7 @@ lookup_kvnode(_Bt, NodeTuple, LowerBound, Keys, Output) when tuple_size(NodeTupl
     {ok, lists:reverse(Output, [{Key, not_found} || Key <- Keys])};
 lookup_kvnode(Bt, NodeTuple, LowerBound, [LookupKey | RestLookupKeys], Output) ->
     N = find_first_gteq(Bt, NodeTuple, LowerBound, tuple_size(NodeTuple), LookupKey),
-    {Key, Value} = element(N, NodeTuple),
+    KV = {Key, _Value} = element(N, NodeTuple),
     case less(Bt, LookupKey, Key) of
     true ->
         % LookupKey is less than Key
@@ -377,10 +376,12 @@ lookup_kvnode(Bt, NodeTuple, LowerBound, [LookupKey | RestLookupKeys], Output) -
         case less(Bt, Key, LookupKey) of
         true ->
             % LookupKey is greater than Key
-            lookup_kvnode(Bt, NodeTuple, N+1, RestLookupKeys, [{LookupKey, not_found} | Output]);
+            lookup_kvnode(Bt, NodeTuple, N+1, RestLookupKeys,
+                          [{LookupKey, not_found} | Output]);
         false ->
             % LookupKey is equal to Key
-            lookup_kvnode(Bt, NodeTuple, N, RestLookupKeys, [{LookupKey, {ok, assemble(Bt, LookupKey, Value)}} | Output])
+            lookup_kvnode(Bt, NodeTuple, N, RestLookupKeys,
+                          [{LookupKey, {ok, assemble(Bt, KV)}} | Output])
         end
     end.
 
@@ -449,8 +450,10 @@ reduce_node(#btree{reduce=nil}, _NodeType, _NodeList) ->
     [];
 reduce_node(#btree{reduce=R}, kp_node, NodeList) ->
     R(rereduce, [element(2, Node) || {_K, Node} <- NodeList]);
+reduce_node(#btree{reduce=R, assemble_kv=identity}, kv_node, NodeList) ->
+    R(reduce, NodeList);
 reduce_node(#btree{reduce=R}=Bt, kv_node, NodeList) ->
-    R(reduce, [assemble(Bt, K, V) || {K, V} <- NodeList]).
+    R(reduce, [assemble(Bt, KV) || KV <- NodeList]).
 
 reduce_tree_size(kv_node, NodeSize, _KvList) ->
     NodeSize;
@@ -555,20 +558,24 @@ modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} |
     end;
 modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} | RestActions], AccNode, QueryOutput) ->
     N = find_first_gteq(Bt, NodeTuple, LowerBound, tuple_size(NodeTuple), ActionKey),
-    {Key, Value} = element(N, NodeTuple),
+    KV={Key, _Value} = element(N, NodeTuple),
     ResultNode =  bounded_tuple_to_revlist(NodeTuple, LowerBound, N - 1, AccNode),
     case less(Bt, ActionKey, Key) of
     true ->
         case ActionType of
         insert ->
             % ActionKey is less than the Key, so insert
-            modify_kvnode(Bt, NodeTuple, N, RestActions, [{ActionKey, ActionValue} | ResultNode], QueryOutput);
+            modify_kvnode(Bt, NodeTuple, N, RestActions,
+                          [{ActionKey, ActionValue} | ResultNode],
+                          QueryOutput);
         remove ->
             % ActionKey is less than the Key, just drop the action
-            modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode, QueryOutput);
+            modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode,
+                          QueryOutput);
         fetch ->
             % ActionKey is less than the Key, the key/value must not exist in the tree
-            modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode, [{not_found, {ActionKey, nil}} | QueryOutput])
+            modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode,
+                          [{not_found, {ActionKey, nil}} | QueryOutput])
         end;
     false ->
         % ActionKey and Key are maybe equal.
@@ -576,16 +583,22 @@ modify_kvnode(Bt, NodeTuple, LowerBound, [{ActionType, ActionKey, ActionValue} |
         false ->
             case ActionType of
             insert ->
-                modify_kvnode(Bt, NodeTuple, N+1, RestActions, [{ActionKey, ActionValue} | ResultNode], QueryOutput);
+                modify_kvnode(Bt, NodeTuple, N+1, RestActions,
+                              [{ActionKey, ActionValue} | ResultNode],
+                              QueryOutput);
             remove ->
-                modify_kvnode(Bt, NodeTuple, N+1, RestActions, ResultNode, QueryOutput);
+                modify_kvnode(Bt, NodeTuple, N+1, RestActions, ResultNode,
+                              QueryOutput);
             fetch ->
                 % ActionKey is equal to the Key, insert into the QueryOuput, but re-process the node
                 % since an identical action key can follow it.
-                modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode, [{ok, assemble(Bt, Key, Value)} | QueryOutput])
+                modify_kvnode(Bt, NodeTuple, N, RestActions, ResultNode,
+                              [{ok, assemble(Bt, KV)} | QueryOutput])
             end;
         true ->
-            modify_kvnode(Bt, NodeTuple, N + 1, [{ActionType, ActionKey, ActionValue} | RestActions], [{Key, Value} | ResultNode], QueryOutput)
+            modify_kvnode(Bt, NodeTuple, N + 1,
+                          [{ActionType, ActionKey, ActionValue} | RestActions],
+                          [KV | ResultNode], QueryOutput)
         end
     end.
 
@@ -633,23 +646,23 @@ reduce_stream_kv_node(Bt, Dir, KVs, KeyStart, InEndRangeFun,
 reduce_stream_kv_node2(_Bt, [], GroupedKey, GroupedKVsAcc, GroupedRedsAcc,
         _KeyGroupFun, _Fun, Acc) ->
     {ok, Acc, GroupedRedsAcc, GroupedKVsAcc, GroupedKey};
-reduce_stream_kv_node2(Bt, [{Key, Value}| RestKVs], GroupedKey, GroupedKVsAcc,
+reduce_stream_kv_node2(Bt, [{Key, _Value}=KV| RestKVs], GroupedKey, GroupedKVsAcc,
         GroupedRedsAcc, KeyGroupFun, Fun, Acc) ->
     case GroupedKey of
     undefined ->
         reduce_stream_kv_node2(Bt, RestKVs, Key,
-                [assemble(Bt,Key,Value)], [], KeyGroupFun, Fun, Acc);
+                [assemble(Bt,KV)], [], KeyGroupFun, Fun, Acc);
     _ ->
 
         case KeyGroupFun(GroupedKey, Key) of
         true ->
             reduce_stream_kv_node2(Bt, RestKVs, GroupedKey,
-                [assemble(Bt,Key,Value)|GroupedKVsAcc], GroupedRedsAcc, KeyGroupFun,
+                [assemble(Bt,KV)|GroupedKVsAcc], GroupedRedsAcc, KeyGroupFun,
                 Fun, Acc);
         false ->
             case Fun(GroupedKey, {GroupedKVsAcc, GroupedRedsAcc}, Acc) of
             {ok, Acc2} ->
-                reduce_stream_kv_node2(Bt, RestKVs, Key, [assemble(Bt,Key,Value)],
+                reduce_stream_kv_node2(Bt, RestKVs, Key, [assemble(Bt,KV)],
                     [], KeyGroupFun, Fun, Acc2);
             {stop, Acc2} ->
                 throw({stop, Acc2})
@@ -812,20 +825,25 @@ stream_kv_node(Bt, Reds, KVs, StartKey, InRange, Dir, Fun, Acc) ->
         fun({Key, _}) -> less(Bt, StartKey, Key) end
     end,
     {LTKVs, GTEKVs} = lists:splitwith(DropFun, KVs),
-    AssembleLTKVs = [assemble(Bt,K,V) || {K,V} <- LTKVs],
+    AssembleLTKVs = case Bt#btree.assemble_kv of
+        identity -> LTKVs;
+        _ -> [assemble(Bt,KV) || KV <- LTKVs]
+    end,
     stream_kv_node2(Bt, Reds, AssembleLTKVs, GTEKVs, InRange, Dir, Fun, Acc).
 
 stream_kv_node2(_Bt, _Reds, _PrevKVs, [], _InRange, _Dir, _Fun, Acc) ->
     {ok, Acc};
-stream_kv_node2(Bt, Reds, PrevKVs, [{K,V} | RestKVs], InRange, Dir, Fun, Acc) ->
+stream_kv_node2(Bt, Reds, PrevKVs, [{K,_V}=KV | RestKVs], InRange, Dir,
+                Fun, Acc) ->
     case InRange(K) of
     false ->
         {stop, {PrevKVs, Reds}, Acc};
     true ->
-        AssembledKV = assemble(Bt, K, V),
+        AssembledKV = assemble(Bt, KV),
         case Fun(visit, AssembledKV, {PrevKVs, Reds}, Acc) of
         {ok, Acc2} ->
-            stream_kv_node2(Bt, Reds, [AssembledKV | PrevKVs], RestKVs, InRange, Dir, Fun, Acc2);
+            stream_kv_node2(Bt, Reds, [AssembledKV | PrevKVs], RestKVs,
+                            InRange, Dir, Fun, Acc2);
         {stop, Acc2} ->
             {stop, {PrevKVs, Reds}, Acc2}
         end
