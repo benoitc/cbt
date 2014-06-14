@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--define(DEFAULT_COMPRESSION, snappy).
+-define(DEFAULT_COMPRESSION, none).
 
 -define(b2l(V), binary_to_list(V)).
 -define(l2b(V), list_to_binary(V)).
