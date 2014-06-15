@@ -22,11 +22,13 @@
 -record(file, {
     fd,
     eof = 0,
-    file_path
+    file_path,
+    open_options
 }).
 
 % public API
--export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, rename/2]).
+-export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, rename/2,
+        reopen/1]).
 -export([pread_term/2, pread_iolist/2, pread_binary/2]).
 -export([append_binary/2, append_binary_crc32/2]).
 -export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
@@ -201,6 +203,12 @@ sync(FilePath) when is_list(FilePath) ->
 sync(Fd) ->
     gen_server:call(Fd, sync, infinity).
 
+%% @doc reopen a file
+-spec reopen(cbt_file()) -> ok | {error, term()}.
+reopen(Fd) ->
+    gen_server:call(Fd, reopen, infinity).
+
+
 %% @doc Close the file.
 -spec close(Fd::cbt_file()) -> ok.
 close(Fd) ->
@@ -316,7 +324,8 @@ init({FilePath, Options}) ->
                     proc_lib:init_ack({ok, self()}),
                     InitState = #file{fd=Fd,
                                       eof=Eof,
-                                      file_path=FilePath},
+                                      file_path=FilePath,
+                                      open_options=OpenOptions},
                     gen_server:enter_loop(?MODULE, [], InitState);
                 Error ->
                     proc_lib:init_ack(Error)
@@ -366,6 +375,19 @@ handle_call({truncate, Pos}, _From, #file{fd=Fd}=File) ->
 handle_call({rename, NewFilePath}, _From, #file{file_path=FilePath} = File) ->
     Reply = file:rename(FilePath, NewFilePath),
     {reply, Reply, File#file{file_path=NewFilePath}};
+
+handle_call(reopen, _From, #file{fd=Fd, file_path=FilePath,
+                                 open_options=OpenOptions}=File) ->
+
+    ok = file:close(Fd),
+    case try_open_fd(FilePath, OpenOptions, ?RETRY_TIME_MS,
+                     ?MAX_RETRY_TIME_MS) of
+        {ok, Fd2} ->
+            {ok, Eof} = file:position(Fd, eof),
+            {reply, ok, File#file{fd=Fd2, eof=Eof}};
+        Error ->
+            {stop, Error, File}
+    end;
 
 handle_call({append_bin, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
     Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
