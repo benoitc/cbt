@@ -372,6 +372,9 @@ handle_call({truncate, Pos}, _From, #file{fd=Fd}=File) ->
         {reply, Error, File}
     end;
 
+handle_call({set_path, NewFilePath}, _From, File) ->
+    {reply, ok, File#file{file_path=NewFilePath}};
+
 handle_call({rename, NewFilePath}, _From, #file{file_path=FilePath} = File) ->
     Reply = file:rename(FilePath, NewFilePath),
     {reply, Reply, File#file{file_path=NewFilePath}};
