@@ -21,11 +21,12 @@
 
 -record(file, {
     fd,
-    eof = 0
+    eof = 0,
+    file_path
 }).
 
 % public API
--export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2]).
+-export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, rename/2]).
 -export([pread_term/2, pread_iolist/2, pread_binary/2]).
 -export([append_binary/2, append_binary_crc32/2]).
 -export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
@@ -187,6 +188,11 @@ bytes(Fd) ->
 truncate(Fd, Pos) ->
     gen_server:call(Fd, {truncate, Pos}, infinity).
 
+%% @doc rename a file safely
+-spec rename(Fd::cbt_file(), NewFilePath::string()) -> ok | {error,term()}.
+rename(Fd, NewFilePath) ->
+    gen_server:call(Fd, {rename, NewFilePath}, infinity).
+
 %% @doc Ensure all bytes written to the file are flushed to disk.
 -spec sync(FdOrPath::cbt_file()|string()) -> ok | {error, term()}.
 sync(FilePath) when is_list(FilePath) ->
@@ -309,7 +315,8 @@ init({FilePath, Options}) ->
 
                     proc_lib:init_ack({ok, self()}),
                     InitState = #file{fd=Fd,
-                                      eof=Eof},
+                                      eof=Eof,
+                                      file_path=FilePath},
                     gen_server:enter_loop(?MODULE, [], InitState);
                 Error ->
                     proc_lib:init_ack(Error)
@@ -355,6 +362,10 @@ handle_call({truncate, Pos}, _From, #file{fd=Fd}=File) ->
     Error ->
         {reply, Error, File}
     end;
+
+handle_call({rename, NewFilePath}, _From, #file{file_path=FilePath} = File) ->
+    Reply = file:rename(FilePath, NewFilePath),
+    {reply, Reply, File#file{file_path=NewFilePath}};
 
 handle_call({append_bin, Bin}, _From, #file{fd = Fd, eof = Pos} = File) ->
     Blocks = make_blocks(Pos rem ?SIZE_BLOCK, Bin),
