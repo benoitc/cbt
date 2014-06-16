@@ -42,7 +42,7 @@
 %% to edit a Key/Vlaue before it's written to the new btree.</li>
 %% <li>`{filter, fun(Item) -> true | false end}', function to filter the
 %% items copied to the new btree.</li>
-%% <li>`override': if the new file should be truncated</lI
+%% <li>`override': if the new file should be truncated</li>
 %% <li>`{compression, Module}': to change the compression on the new
 %% btree.</li>
 %% </ul>
