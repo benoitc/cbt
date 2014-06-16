@@ -46,7 +46,7 @@ Run the following command line:
     $ make doc
 
 and open the `index.html` file in the doc folder. Or read it
-[online](http://refugeio.bitbucket.org/cbt/index.html).
+[online](http://cbt.cowdb.org).
 
 ## Example of usage:
 
