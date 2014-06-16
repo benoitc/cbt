@@ -26,7 +26,7 @@ install it.
 
 Fetch the source code:
 
-    $ git clone git@bitbucket.org:refugeio/cbt.git
+    $ git clone https://bitbucket.org/refugeio/cbt.git
 
 Build the source, run the `make` command. It will fetch any needed
 dependencies.
