@@ -10,7 +10,7 @@ $(if $(ERLC),,$(warning "Warning: No Erlang found in your path, this will probab
 
 $(if $(ESCRIPT),,$(warning "Warning: No escript found in your path, this will probably not work"))
 
-.PHONY: deps doc
+.PHONY: deps doc test
 
 all: deps compile
 
@@ -25,10 +25,8 @@ deps:
 doc: dev
 	$(REBAR) -C rebar_dev.config doc skip_deps=true
 
-cover: dev
-	COVER=1 prove t/*.t
-	@$(ERL) -detached -noshell -eval 'etap_report:create()' -s init stop
-
+test: dev
+	${REBAR} -C rebar_dev.config eunit skip_deps=true
 clean:
 	@$(REBAR) clean
 	@rm -f t/*.beam t/temp.*
@@ -41,34 +39,6 @@ distclean: clean
 dialyzer: compile
 	@dialyzer -Wno_return -c ebin
 
-
-
-#
-# TESTS
-#
-CBT_ETAP_DIR=$(BASE_DIR)/t
-export CBT_ETAP_DIR
-
-
-ERL_FLAGS=-pa $(BASE_DIR)/deps/*/ebin -pa $(BASE_DIR)/ebin -pa $(CBT_ETAP_DIR)
-export ERL_FLAGS
-
-test: devbuild testbuild
-	prove $(CBT_ETAP_DIR)/*.t
-
-verbose-test: devbuild testbuild
-	echo $(ERL_FLAGS)
-	prove -v $(CBT_ETAP_DIR)/*.t
-
-testbuild: testclean
-	@echo "==> init test environement"
-	@$(ERLC) -v -o $(CBT_ETAP_DIR) $(CBT_ETAP_DIR)/etap.erl
-	@$(ERLC) -v -o $(CBT_ETAP_DIR) $(CBT_ETAP_DIR)/test_util.erl
-
-testclean:
-	@rm -rf $(CBT_ETAP_DIR)/*.beam
-	@rm -rf $(CBT_ETAP_DIR)/temp.*
-
 # development
 #
 devclean:
@@ -79,6 +49,3 @@ devbuild: devdeps
 
 devdeps:
 	$(REBAR) -C rebar_dev.config get-deps
-
-
-
