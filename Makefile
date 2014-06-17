@@ -25,6 +25,9 @@ deps:
 doc: dev
 	$(REBAR) -C rebar_dev.config doc skip_deps=true
 
+test: dev
+	${REBAR} eunit skip_deps=true
+
 cover: dev
 	COVER=1 prove t/*.t
 	@$(ERL) -detached -noshell -eval 'etap_report:create()' -s init stop
@@ -53,10 +56,10 @@ export CBT_ETAP_DIR
 ERL_FLAGS=-pa $(BASE_DIR)/deps/*/ebin -pa $(BASE_DIR)/ebin -pa $(CBT_ETAP_DIR)
 export ERL_FLAGS
 
-test: devbuild testbuild
+test1: devbuild testbuild
 	prove $(CBT_ETAP_DIR)/*.t
 
-verbose-test: devbuild testbuild
+verbose-test1: devbuild testbuild
 	echo $(ERL_FLAGS)
 	prove -v $(CBT_ETAP_DIR)/*.t
 
