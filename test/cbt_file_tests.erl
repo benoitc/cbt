@@ -145,7 +145,7 @@ header_test_() ->
             ]),
             should_recover_header_marker_corruption(),
             should_recover_header_size_corruption(),
-            should_recover_header_md5sig_corruption(),
+            should_recover_header_crc32sig_corruption(),
             should_recover_header_data_corruption()
         ]
     }.
@@ -210,7 +210,7 @@ should_recover_header_size_corruption() ->
             end)
     ).
 
-should_recover_header_md5sig_corruption() ->
+should_recover_header_crc32sig_corruption() ->
     ?_assertMatch(
         ok,
         check_header_recovery(
