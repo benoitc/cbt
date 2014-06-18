@@ -94,10 +94,10 @@ decompress(<<?SNAPPY_PREFIX, Rest/binary>>) ->
     {ok, TermBin} = snappy:decompress(Rest),
     binary_to_term(TermBin);
 decompress(<<?GZIP_PREFIX, Rest/binary>>) ->
-    {ok, TermBin} = zlip:gunzip(Rest),
+    {ok, TermBin} = zlib:gunzip(Rest),
     binary_to_term(TermBin);
 decompress(<<?LZ4_PREFIX, Rest/binary>>) ->
-    {ok, TermBin} = lz4:decompress(Rest),
+    {ok, TermBin} = lz4:uncompress(Rest),
     binary_to_term(TermBin);
 decompress(<<?TERM_PREFIX, _/binary>> = Bin) ->
     binary_to_term(Bin).
