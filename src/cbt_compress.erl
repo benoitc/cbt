@@ -16,6 +16,7 @@
 
 -include("cbt.hrl").
 
+-define(NO_COMPRESSION, 0).
 % binaries compressed with snappy have their first byte set to this value
 -define(SNAPPY_PREFIX, 1).
 % binaries compressed with gzip have their first byte set to this value
@@ -27,8 +28,7 @@
 -define(TERM_PREFIX, 131).
 -define(COMPRESSED_TERM_PREFIX, 131, 80).
 
--type compression_method() :: snappy | lz4 | gzip
-                              | {deflate, Level::integer()} | none.
+-type compression_method() :: snappy | lz4 | gzip | none.
 -export_type([compression_method/0]).
 
 
@@ -42,22 +42,6 @@ use_compressed(_UncompressedSize, _CompressedSize) ->
 %% @doc compress an encoded binary with the following type. When an
 %% erlang term is given it is encoded to a binary.
 -spec compress(Bin::binary()|term(), Method::compression_method()) -> Bin::binary().
-compress(<<?SNAPPY_PREFIX, _/binary>> = Bin, snappy) ->
-    Bin;
-compress(<<?GZIP_PREFIX, _/binary>> = Bin, gzip) ->
-    Bin;
-compress(<<?LZ4_PREFIX, _/binary>> = Bin, lz4) ->
-    Bin;
-compress(<<?SNAPPY_PREFIX, _/binary>> = Bin, Method) ->
-    compress(decompress(Bin), Method);
-compress(<<?GZIP_PREFIX, _/binary>> = Bin, Method) ->
-    compress(decompress(Bin), Method);
-compress(<<?LZ4_PREFIX, _/binary>> = Bin, Method) ->
-    compress(decompress(Bin), Method);
-compress(<<?TERM_PREFIX, _/binary>> = Bin, Method) ->
-    compress(decompress(Bin), Method);
-compress(Term, {deflate, Level}) ->
-    term_to_binary(Term, [{minor_version, 1}, {compressed, Level}]);
 compress(Term, snappy) ->
     Bin = ?term_to_bin(Term),
     {ok, CompressedBin} = snappy:compress(Bin),
@@ -65,7 +49,7 @@ compress(Term, snappy) ->
         true ->
             <<?SNAPPY_PREFIX, CompressedBin/binary>>;
         false ->
-            Bin
+            << ?NO_COMPRESSION, Bin/binary >>
     end;
 compress(Term, gzip) ->
     Bin = ?term_to_bin(Term),
@@ -74,48 +58,45 @@ compress(Term, gzip) ->
         true ->
             <<?GZIP_PREFIX, CompressedBin/binary>>;
         false ->
-            Bin
+            << ?NO_COMPRESSION, Bin/binary >>
     end;
 compress(Term, lz4) ->
     Bin = ?term_to_bin(Term),
     {ok, CompressedBin} = lz4:compress(erlang:iolist_to_binary(Bin)),
     case use_compressed(byte_size(Bin), byte_size(CompressedBin)) of
         true ->
-            <<?LZ4_PREFIX, CompressedBin>>;
+            <<?NO_COMPRESSION, CompressedBin/binary >>;
         false ->
-           Bin
+           << ?NO_COMPRESSION, Bin/binary >>
     end;
 compress(Term, none) ->
-    ?term_to_bin(Term).
+    Bin = ?term_to_bin(Term),
+    << ?NO_COMPRESSION, Bin/binary >>.
 
 %% @doc decompress a binary to an erlang decoded term.
 -spec decompress(Bin::binary()) -> Term::term().
+decompress(<<?NO_COMPRESSION, TermBin/binary >>) ->
+    binary_to_term(TermBin);
 decompress(<<?SNAPPY_PREFIX, Rest/binary>>) ->
     {ok, TermBin} = snappy:decompress(Rest),
     binary_to_term(TermBin);
 decompress(<<?GZIP_PREFIX, Rest/binary>>) ->
-    {ok, TermBin} = zlib:gunzip(Rest),
+    TermBin = zlib:gunzip(Rest),
     binary_to_term(TermBin);
 decompress(<<?LZ4_PREFIX, Rest/binary>>) ->
-    {ok, TermBin} = lz4:uncompress(Rest),
-    binary_to_term(TermBin);
-decompress(<<?TERM_PREFIX, _/binary>> = Bin) ->
-    binary_to_term(Bin).
+    TermBin = lz4:uncompress(Rest),
+    binary_to_term(TermBin).
 
 %% @doc check if the binary has been compressed.
 -spec is_compressed(Bin::binary()|term(),
                     Method::compression_method()) -> true | false.
+is_compressed(<<?NO_COMPRESSION, _/binary>>, none) ->
+    false;
 is_compressed(<<?SNAPPY_PREFIX, _/binary>>, snappy) ->
     true;
 is_compressed(<<?GZIP_PREFIX, _/binary>>, gzip) ->
     true;
 is_compressed(<<?LZ4_PREFIX, _/binary>>, lz4) ->
-    true;
-is_compressed(<<?COMPRESSED_TERM_PREFIX, _/binary>>, {deflate, _Level}) ->
-    true;
-is_compressed(<<?COMPRESSED_TERM_PREFIX, _/binary>>, _Method) ->
-    false;
-is_compressed(<<?TERM_PREFIX, _/binary>>, none) ->
     true;
 is_compressed(_Term, _Method) ->
     false.
