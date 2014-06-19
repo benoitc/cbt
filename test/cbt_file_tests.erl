@@ -67,8 +67,6 @@ read_write_test_() ->
             fun should_write_and_read_term/1,
             fun should_write_and_read_binary/1,
             fun should_write_and_read_large_binary/1,
-            fun should_return_term_as_binary_for_reading_binary/1,
-            fun should_read_term_written_as_binary/1,
             fun should_read_iolist/1,
             fun should_fsync/1,
             fun should_not_read_beyond_eof/1,
@@ -94,15 +92,6 @@ should_write_and_read_term(Fd) ->
 should_write_and_read_binary(Fd) ->
     {ok, Pos, _} = cbt_file:append_binary(Fd, <<"fancy!">>),
     ?_assertMatch({ok, <<"fancy!">>}, cbt_file:pread_binary(Fd, Pos)).
-
-should_return_term_as_binary_for_reading_binary(Fd) ->
-    {ok, Pos, _} = cbt_file:append_term(Fd, foo),
-    Foo = cbt_compress:compress(foo, snappy),
-    ?_assertMatch({ok, Foo}, cbt_file:pread_binary(Fd, Pos)).
-
-should_read_term_written_as_binary(Fd) ->
-    {ok, Pos, _} = cbt_file:append_binary(Fd, <<131,100,0,3,102,111,111>>),
-    ?_assertMatch({ok, foo}, cbt_file:pread_term(Fd, Pos)).
 
 should_write_and_read_large_binary(Fd) ->
     BigBin = list_to_binary(lists:duplicate(100000, 0)),
