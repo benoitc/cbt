@@ -343,10 +343,10 @@ handle_call({pread_iolist, Pos}, _From, File) ->
         read_raw_iolist_int(File, Pos, 2 * ?SIZE_BLOCK - (Pos rem ?SIZE_BLOCK))
     catch
     _:_ ->
-        read_raw_iolist_int(File, Pos, 4)
+            read_raw_iolist_int(File, Pos, 4)
     end,
-    <<Prefix:1/integer, Len:31/integer, RestRawData/binary>> =
-        iolist_to_binary(RawData),
+    {Begin, RestRawData} = split_iolist(RawData, 4, []),
+    <<Prefix:1/integer, Len:31/integer>> = iolist_to_binary(Begin),
     case Prefix of
     1 ->
         {Crc32, IoList} = extract_crc32(
@@ -538,18 +538,20 @@ load_header(Fd, Block) ->
             <<RestBlock/binary, Missing/binary>>
     end,
     <<Crc32Sig:32/integer, HeaderBin/binary>> =
-        iolist_to_binary(remove_block_prefixes(5, RawBin)),
+        iolist_to_binary(remove_block_prefixes(RawBin, 5)),
     Crc32Sig = erlang:crc32(HeaderBin),
     {ok, HeaderBin}.
 
-maybe_read_more_iolist(Buffer, DataSize, _, _)
-    when DataSize =< byte_size(Buffer) ->
-    <<Data:DataSize/binary, _/binary>> = Buffer,
-    [Data];
-maybe_read_more_iolist(Buffer, DataSize, NextPos, File) ->
-    {Missing, _} =
-        read_raw_iolist_int(File, NextPos, DataSize - byte_size(Buffer)),
-    [Buffer, Missing].
+
+maybe_read_more_iolist(Buffer, DataSize, NextPos, Fd) ->
+    case iolist_size(Buffer) of
+        BufferSize when DataSize =< BufferSize ->
+            {Buffer2, _} = split_iolist(Buffer, DataSize, []),
+            Buffer2;
+        BufferSize ->
+            {Missing, _} = read_raw_iolist_int(Fd, NextPos, DataSize-BufferSize),
+            [Buffer, Missing]
+    end.
 
 -spec read_raw_iolist_int(#file{}, Pos::non_neg_integer(), Len::non_neg_integer()) ->
     {Data::iolist(), CurPos::non_neg_integer()}.
@@ -558,8 +560,20 @@ read_raw_iolist_int(Fd, {Pos, _Size}, Len) -> % 0110 UPGRADE CODE
 read_raw_iolist_int(#file{fd = Fd}, Pos, Len) ->
     BlockOffset = Pos rem ?SIZE_BLOCK,
     TotalBytes = calculate_total_read_len(BlockOffset, Len),
-    {ok, <<RawBin:TotalBytes/binary>>} = file:pread(Fd, Pos, TotalBytes),
-    {remove_block_prefixes(BlockOffset, RawBin), Pos + TotalBytes}.
+    case file:pread(Fd, Pos, TotalBytes) of
+        {ok, <<RawBin:TotalBytes/binary>>} ->
+            {remove_block_prefixes(RawBin, BlockOffset), Pos + TotalBytes};
+        {ok, RawBin} ->
+            UnexpectedBin = {
+                    unexpected_binary,
+                    {at, Pos},
+                    {wanted_bytes, TotalBytes},
+                    {got, byte_size(RawBin), RawBin}
+                    },
+            throw({read_error, UnexpectedBin});
+        Else ->
+            throw({read_error, Else})
+    end.
 
 -spec extract_crc32(iolist()) -> {binary(), iolist()}.
 extract_crc32(FullIoList) ->
@@ -578,16 +592,18 @@ calculate_total_read_len(BlockOffset, FinalLen) ->
                 true -> 1 end
     end.
 
-remove_block_prefixes(_BlockOffset, <<>>) ->
+
+
+remove_block_prefixes(<<>>, _BlockOffset) ->
     [];
-remove_block_prefixes(0, <<_BlockPrefix,Rest/binary>>) ->
-    remove_block_prefixes(1, Rest);
-remove_block_prefixes(BlockOffset, Bin) ->
+remove_block_prefixes(<<_BlockPrefix, Rest/binary>>, 0) ->
+    remove_block_prefixes(Rest, 1);
+remove_block_prefixes(Bin, BlockOffset) ->
     BlockBytesAvailable = ?SIZE_BLOCK - BlockOffset,
     case size(Bin) of
     Size when Size > BlockBytesAvailable ->
         <<DataBlock:BlockBytesAvailable/binary,Rest/binary>> = Bin,
-        [DataBlock | remove_block_prefixes(0, Rest)];
+        [DataBlock | remove_block_prefixes(Rest, 0)];
     _Size ->
         [Bin]
     end.
@@ -609,13 +625,14 @@ make_blocks(BlockOffset, IoList) ->
 %% is larger than byte_size(IoList), return the difference.
 -spec split_iolist(IoList::iolist(), SplitAt::non_neg_integer(), Acc::list()) ->
     {iolist(), iolist()} | non_neg_integer().
+
 split_iolist(List, 0, BeginAcc) ->
     {lists:reverse(BeginAcc), List};
 split_iolist([], SplitAt, _BeginAcc) ->
     SplitAt;
-split_iolist([<<Bin/binary>> | Rest], SplitAt, BeginAcc) when SplitAt > byte_size(Bin) ->
+split_iolist([Bin | Rest], SplitAt, BeginAcc) when is_binary(Bin), SplitAt > byte_size(Bin) ->
     split_iolist(Rest, SplitAt - byte_size(Bin), [Bin | BeginAcc]);
-split_iolist([<<Bin/binary>> | Rest], SplitAt, BeginAcc) ->
+split_iolist([Bin | Rest], SplitAt, BeginAcc) when is_binary(Bin) ->
     <<Begin:SplitAt/binary,End/binary>> = Bin,
     split_iolist([End | Rest], 0, [Begin | BeginAcc]);
 split_iolist([Sublist| Rest], SplitAt, BeginAcc) when is_list(Sublist) ->

@@ -75,6 +75,7 @@ compress(Term, none) ->
 
 %% @doc decompress a binary to an erlang decoded term.
 -spec decompress(Bin::binary()) -> Term::term().
+
 decompress(<<?NO_COMPRESSION, TermBin/binary >>) ->
     binary_to_term(TermBin);
 decompress(<<?SNAPPY_PREFIX, Rest/binary>>) ->
