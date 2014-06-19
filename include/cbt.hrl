@@ -30,5 +30,6 @@
     less = fun(A, B) -> A < B end,
     reduce = nil,
     compression = ?DEFAULT_COMPRESSION,
-    chunk_threshold = 16#4ff
+    kv_chunk_threshold =  16#4ff,
+    kp_chunk_threshold = 2 * 16#4ff
 }).

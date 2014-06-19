@@ -24,6 +24,8 @@
     before_kv_write = {fun(Item, Acc) -> {Item, Acc} end, []},
     filter = fun(_) -> true end,
     compression = ?DEFAULT_COMPRESSION,
+    kv_chunk_threshold,
+    kp_chunk_threshold,
     nodes = dict:from_list([{1, []}]),
     cur_level = 1,
     max_level = 1
@@ -55,9 +57,13 @@ copy(Btree, Fd, Options) ->
     false ->
         ok
     end,
-    Acc0 = apply_options(Options, #acc{btree = Btree, fd = Fd}),
+    Acc0 = #acc{btree = Btree,
+                fd = Fd,
+                kv_chunk_threshold = Btree#btree.kv_chunk_threshold,
+                kp_chunk_threshold = Btree#btree.kp_chunk_threshold},
+    Acc = apply_options(Options, Acc0),
     {ok, _, #acc{cur_level = 1} = FinalAcc0} = cbt_btree:fold(
-        Btree, fun fold_copy/3, Acc0, []),
+        Btree, fun fold_copy/3, Acc, []),
     {ok, CopyRootState, FinalAcc} = finish_copy(FinalAcc0),
     ok = cbt_file:sync(Fd),
     {_, LastUserAcc} = FinalAcc#acc.before_kv_write,
@@ -73,8 +79,11 @@ apply_options([{filter, Fun} | Rest], Acc) ->
 apply_options([override | Rest], Acc) ->
     apply_options(Rest, Acc);
 apply_options([{compression, Comp} | Rest], Acc) ->
-    apply_options(Rest, Acc#acc{compression = Comp}).
-
+    apply_options(Rest, Acc#acc{compression = Comp});
+apply_options([{kv_chunk_threshold, Threshold} | Rest], Acc) ->
+    apply_options(Rest, Acc#acc{kv_chunk_threshold = Threshold});
+apply_options([{kp_chunk_threshold, Threshold} | Rest], Acc) ->
+    apply_options(Rest, Acc#acc{kp_chunk_threshold = Threshold}).
 
 extract(#acc{btree = #btree{extract_kv = identity}}, Value) ->
     Value;
@@ -128,7 +137,7 @@ fold_copy(Item, _Reds, #acc{nodes = Nodes, cur_level = 1, filter = Filter} = Acc
         {K, V} = extract(Acc, Item),
         LevelNode = dict:fetch(1, Nodes),
         LevelNodes2 = [{K, V} | LevelNode],
-        NextAcc = case ?term_size(LevelNodes2) >= ?CHUNK_THRESHOLD of
+        NextAcc = case ?term_size(LevelNodes2) >= Acc#acc.kv_chunk_threshold of
         true ->
             {LeafState, Acc2} = flush_leaf(LevelNodes2, Acc),
             bubble_up({K, LeafState}, Acc2);
@@ -154,7 +163,7 @@ bubble_up({Key, NodeState}, Level, #acc{max_level = MaxLevel,
     _ when Level < MaxLevel ->
         NextLevelNodes = dict:fetch(Level + 1, Acc2#acc.nodes),
         NextLevelNodes2 = [{Key, NodeState} | NextLevelNodes],
-        case ?term_size(NextLevelNodes2) >= ?CHUNK_THRESHOLD of
+        case ?term_size(NextLevelNodes2) >= Acc#acc.kp_chunk_threshold of
         true ->
             {ok, NewNodeState} = write_kp_node(
                 Acc2, lists:reverse(NextLevelNodes2)),

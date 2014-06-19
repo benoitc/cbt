@@ -25,14 +25,16 @@
 
 -include("cbt.hrl").
 
--define(CHUNK_THRESHOLD, 16#4ff).
+-define(BTREE_KV_CHUNK_THRESHOLD, 7168).
+-define(BTREE_KP_CHUNK_THRESHOLD, 6144).
 
 -type cbtree() :: #btree{}.
 -type cbtree_root() :: {integer(), list(), integer()}.
 -type cbtree_options() :: [{split, fun()} | {join, fun()} | {less, fun()}
                         | {reduce, fun()}
                         | {compression, cbt_compress:compression_method()}
-                        | {chunk_threshold, integer()}].
+                        | {kv_chunk_threshold, integer()}
+                        | {kp_chunk_threshold, integer()}].
 
 -type cbt_kv() :: {Key::any(), Val::any()}.
 -type cbt_kvs() :: [cbt_kv()].
@@ -104,8 +106,10 @@ set_options(Bt, [{reduce, Reduce}|Rest]) ->
     set_options(Bt#btree{reduce=Reduce}, Rest);
 set_options(Bt, [{compression, Comp}|Rest]) ->
     set_options(Bt#btree{compression=Comp}, Rest);
-set_options(Bt, [{chunk_threshold, Threshold}|Rest]) ->
-    set_options(Bt#btree{chunk_threshold = Threshold}, Rest).
+set_options(Bt, [{kv_chunk_threshold, Threshold}|Rest]) ->
+    set_options(Bt#btree{kv_chunk_threshold = Threshold}, Rest);
+set_options(Bt, [{kp_chunk_threshold, Threshold}|Rest]) ->
+    set_options(Bt#btree{kp_chunk_threshold = Threshold}, Rest).
 
 
 %% @doc return the size in bytes of a btree
@@ -394,12 +398,13 @@ complete_root(Bt, KPs) ->
     {ok, ResultKeyPointers} = write_node(Bt, kp_node, KPs),
     complete_root(Bt, ResultKeyPointers).
 
-%%%%%%%%%%%%% The chunkify function sucks! %%%%%%%%%%%%%
-% It is inaccurate as it does not account for compression when blocks are
-% written. Plus with the "case byte_size(term_to_binary(InList)) of" code
-% it's probably really inefficient.
 
-chunkify(#btree{chunk_threshold = ChunkThreshold0}, InList) ->
+chunkify(#btree{kp_chunk_threshold = T}, kp_node, InList) ->
+    chunkify(T, InList);
+chunkify(#btree{kv_chunk_threshold = T}, kv_node, InList) ->
+    chunkify(T, InList).
+
+chunkify(ChunkThreshold0, InList) ->
     case ?term_size(InList) of
     Size when Size > ChunkThreshold0 ->
         NumberOfChunksLikely = ((Size div ChunkThreshold0) + 1),
@@ -472,7 +477,7 @@ get_node(#btree{fd = Fd}, NodePos) ->
 
 write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
     % split up nodes into smaller sizes
-    NodeListList = chunkify(Bt, NodeList),
+    NodeListList = chunkify(Bt, NodeType, NodeList),
     % now write out each chunk and return the KeyPointer pairs for those nodes
     ResultList = [
         begin
