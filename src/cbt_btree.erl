@@ -12,7 +12,6 @@
 
 -module(cbt_btree).
 
--export([new/1]).
 -export([open/2, open/3]).
 -export([query_modify/4, add/2, add_remove/3]).
 -export([lookup/2]).
@@ -51,13 +50,9 @@
 -export_type([cbt_keys/0]).
 -export_type([cbt_fold_options/0]).
 
-%% @doc create a new btree
--spec new(Fd::cbt_file:cbt_file()) -> {ok, cbtree()}.
-new(Fd) ->
-    open(nil, Fd).
 
 %% @doc open a btree from the file.
-% pass in 'nil' for State if a new Btree.
+%% pass in 'nil' for State if a new Btree.
 -spec open(State::nil | cbtree(), Fd::cbt_file:cbt_file()) -> {ok, cbtree()}.
 open(State, Fd) ->
     {ok, #btree{root=State, fd=Fd}}.

@@ -54,12 +54,12 @@ Example of usage:
 
 Store a {Key Value} pair in a btree:
 
-    1> {ok, Fd} = cbt_file:open("test.db", [create_if_missing]).   
+    1> {ok, Fd} = cbt_file:open("test.db", [create_if_missing]).
     {ok,<0.35.0>}
-    2> {ok, Btree} = cbt_btree:new(Fd).
+    2> {ok, Btree} = cbt_btree:open(nil, Fd).
     {ok,{btree,<0.35.0>,nil,undefined,undefined,undefined,nil,
                snappy,1279}}
-    3> 
+    3>
     3> {ok, Btree2} = cbt_btree:add(Btree, [{a, 1}]).
     {ok,{btree,<0.35.0>,
                {0,[],32},
@@ -77,15 +77,15 @@ value. Until we write the header, the database value is not changed.
 Now open the database in a new process and read the btree using the last
 header:
 
-    7> {ok, Fd1} = cbt_file:open("test.db"). 
+    7> {ok, Fd1} = cbt_file:open("test.db").
     {ok,<0.44.0>}
-    8> 
+    8>
     8> {ok, Header1} = cbt_file:read_header(Fd1).
     {ok,{1,{0,[],32}}}
-    9> Header1 == Header 
+    9> Header1 == Header
     9> .
     true
-    10> {_, ReaderRoot} = Header1.   
+    10> {_, ReaderRoot} = Header1.
     {1,{0,[],32}}
     11> {ok, SnapshotBtree} = cbt_btree:open(ReaderRoot, Fd1).
     {ok,{btree,<0.44.0>,
