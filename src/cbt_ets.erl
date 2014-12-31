@@ -29,17 +29,24 @@
          sync/1,
          empty/1]).
 
+
+%% @doc create new ETS storage
+-spec new(DbName :: atom) -> atom().
 new(DbName) when is_atom(DbName) ->
     Tid = ets:new(DbName, [named_table, ordered_set, public, {keypos, 2}]),
     %% make meta
     ets:insert_new(DbName, #ets_btree_meta{key=?ETS_META_KEY}),
     Tid.
 
+%% @doc delete ETS storage
+-spec delete(Tab :: atom()) -> ok.
 delete(Tab) ->
    true = ets:delete(Tab),
    ok.
 
-
+%% @doc open a btree from the storage
+-spec open_btree(Tab :: atom(), BtName :: any()) ->
+    {ok, cbt_btree:cbbtree()} | {error, term()}.
 open_btree(Tab, BtName) ->
     open_btree(Tab, BtName, []).
 
@@ -54,13 +61,21 @@ open_btree(Tab, BtName, Options0) when Tab /= ?ETS_META_KEY ->
             cbt_btree:open(BtState, Tab, Options)
     end.
 
+%% @doc update the btree state in the storage which allows the new changes to
+%% be read by others.
+-spec update_btree(Tab :: atom(), BtName :: any(),
+                   Btree :: cbt_btre:cbtree()) -> true.
 update_btree(Tab, BtName, Btree) ->
     BtState = cbt_btree:get_state(Btree),
     ets:insert(Tab, #ets_btree{name=BtName, root = BtState}).
 
+%% @doc delete the btree reference in the storage
+-spec delete_btree(Tab :: atom(), BtName :: any()) -> true.
 delete_btree(Tab, BtName) ->
     ets:delete(Tab, BtName).
 
+%% @doc return the size in memory of the storage
+-spec bytes(Tab :: atom()) -> integer().
 bytes(Tab) ->
     ets:info(Tab, memory).
 
