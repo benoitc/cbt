@@ -1,0 +1,5 @@
+%% encoding: UTF-8
+{application,cbt}.
+{packages,[]}.
+{modules,[cbt_backend,cbt_btree,cbt_btree_copy,cbt_compress,cbt_ets,cbt_file,
+          cbt_stream,cbt_util]}.

@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module cbt_btree</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module cbt_btree</h1>
+<ul class="index"><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+
+
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-cbt_fold_options">cbt_fold_options()</a></h3>
+<p><tt>cbt_fold_options() = [{dir, fwd | rev} | {start_key, term()} | {end_key, term()} | {end_key_gt, term()} | {key_group_fun, function()}]</tt></p>
+
+
+<h3 class="typedecl"><a name="type-cbt_keys">cbt_keys()</a></h3>
+<p><tt>cbt_keys() = [term()]</tt></p>
+
+
+<h3 class="typedecl"><a name="type-cbt_kv">cbt_kv()</a></h3>
+<p><tt>cbt_kv() = {Key::any(), Val::any()}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-cbt_kvs">cbt_kvs()</a></h3>
+<p><tt>cbt_kvs() = [<a href="#type-cbt_kv">cbt_kv()</a>]</tt></p>
+
+
+<h3 class="typedecl"><a name="type-cbtree">cbtree()</a></h3>
+<p><tt>cbtree() = #btree{}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-cbtree_options">cbtree_options()</a></h3>
+<p><tt>cbtree_options() = [{backend, cbt_file | atom()} | {split, function()} | {join, function()} | {less, function()} | {reduce, function()} | {compression, <a href="cbt_compress.html#type-compression_method">cbt_compress:compression_method()</a>} | {kv_chunk_threshold, integer()} | {kp_chunk_threshold, integer()}]</tt></p>
+
+
+<h3 class="typedecl"><a name="type-cbtree_root">cbtree_root()</a></h3>
+<p><tt>cbtree_root() = {integer(), list(), integer()}</tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#add-2">add/2</a></td><td>insert a list of key/values in the btree.</td></tr>
+<tr><td valign="top"><a href="#add_remove-3">add_remove/3</a></td><td>insert and remove a list of key/values in the btree in one
+  write.</td></tr>
+<tr><td valign="top"><a href="#final_reduce-2">final_reduce/2</a></td><td>apply the reduce function on last reductions.</td></tr>
+<tr><td valign="top"><a href="#fold-3">fold/3</a></td><td>fold key/values in the btree.</td></tr>
+<tr><td valign="top"><a href="#fold-4">fold/4</a></td><td></td></tr>
+<tr><td valign="top"><a href="#fold_reduce-4">fold_reduce/4</a></td><td>fold reduce values.</td></tr>
+<tr><td valign="top"><a href="#full_reduce-1">full_reduce/1</a></td><td>return the full reduceed value from the btree.</td></tr>
+<tr><td valign="top"><a href="#get_state-1">get_state/1</a></td><td>return the latest btree root that will be stored in the database
+  header or value.</td></tr>
+<tr><td valign="top"><a href="#less-3">less/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#lookup-2">lookup/2</a></td><td>lookup for a list of keys in the btree
+  Results are returned in the same order as the keys.</td></tr>
+<tr><td valign="top"><a href="#open-2">open/2</a></td><td>open a btree using the default backend cbt_file.</td></tr>
+<tr><td valign="top"><a href="#open-3">open/3</a></td><td>open a btree .</td></tr>
+<tr><td valign="top"><a href="#query_modify-4">query_modify/4</a></td><td>insert and remove a list of key/values and retrieve a list of
+  key/values from their key in the btree in one call.</td></tr>
+<tr><td valign="top"><a href="#set_options-2">set_options/2</a></td><td>set btreee options.</td></tr>
+<tr><td valign="top"><a href="#size-1">size/1</a></td><td>return the size in bytes of a btree.</td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="add-2">add/2</a></h3>
+<div class="spec">
+<p><tt>add(Btree::<a href="#type-cbtree">cbtree()</a>, InsertKeyValues::<a href="#type-cbt_kvs">cbt_kvs()</a>) -&gt; {ok, Btree2::<a href="#type-cbtree">cbtree()</a>}</tt><br></p>
+</div><p>insert a list of key/values in the btree</p>
+
+<h3 class="function"><a name="add_remove-3">add_remove/3</a></h3>
+<div class="spec">
+<p><tt>add_remove(Btree::<a href="#type-cbtree">cbtree()</a>, InsertKeyValues::<a href="#type-cbt_kvs">cbt_kvs()</a>, RemoveKeys::<a href="#type-cbt_keys">cbt_keys()</a>) -&gt; {ok, Btree2::<a href="#type-cbtree">cbtree()</a>}</tt><br></p>
+</div><p>insert and remove a list of key/values in the btree in one
+  write.</p>
+
+<h3 class="function"><a name="final_reduce-2">final_reduce/2</a></h3>
+<div class="spec">
+<p><tt>final_reduce(Btree::<a href="#type-cbtree">cbtree()</a>, LastReduction::{any(), any()}) -&gt; term()</tt><br></p>
+</div><p>apply the reduce function on last reductions.</p>
+
+<h3 class="function"><a name="fold-3">fold/3</a></h3>
+<div class="spec">
+<p><tt>fold(Btree::<a href="#type-cbtree">cbtree()</a>, Fun::function(), Acc::term()) -&gt; {ok, {KVs::<a href="#type-cbt_kvs">cbt_kvs()</a>, Reductions::[term()]}, Acc2::term()}</tt><br></p>
+</div><p>fold key/values in the btree</p>
+
+<h3 class="function"><a name="fold-4">fold/4</a></h3>
+<div class="spec">
+<p><tt>fold(Btree::<a href="#type-cbtree">cbtree()</a>, Fun::function(), Acc::term(), Options::<a href="#type-cbt_fold_options">cbt_fold_options()</a>) -&gt; {ok, {KVs::<a href="#type-cbt_kvs">cbt_kvs()</a>, Reductions::[term()]}, Acc2::term()}</tt><br></p>
+</div>
+
+<h3 class="function"><a name="fold_reduce-4">fold_reduce/4</a></h3>
+<div class="spec">
+<p><tt>fold_reduce(Btree::<a href="#type-cbtree">cbtree()</a>, FoldFun::function(), Acc::any(), Options::<a href="#type-cbt_fold_options">cbt_fold_options()</a>) -&gt; {ok, Acc2::term()}</tt><br></p>
+</div><p>fold reduce values.
+ </p>
+
+<h3 class="function"><a name="full_reduce-1">full_reduce/1</a></h3>
+<div class="spec">
+<p><tt>full_reduce(Btree::<a href="#type-cbtree">cbtree()</a>) -&gt; {ok, term()}</tt><br></p>
+</div><p>return the full reduceed value from the btree.</p>
+
+<h3 class="function"><a name="get_state-1">get_state/1</a></h3>
+<div class="spec">
+<p><tt>get_state(Btree::<a href="#type-cbtree">cbtree()</a>) -&gt; State::tuple()</tt><br></p>
+</div><p>return the latest btree root that will be stored in the database
+  header or value</p>
+
+<h3 class="function"><a name="less-3">less/3</a></h3>
+<div class="spec">
+<p><tt>less(Btree, A, B) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="lookup-2">lookup/2</a></h3>
+<div class="spec">
+<p><tt>lookup(Btree::<a href="#type-cbtree">cbtree()</a>, Keys::<a href="#type-cbt_keys">cbt_keys()</a>) -&gt; [{ok, <a href="#type-cbt_kv">cbt_kv()</a>} | not_found]</tt><br></p>
+</div><p>lookup for a list of keys in the btree
+  Results are returned in the same order as the keys. If the key is
+  not_found the <code>not_found</code> result is appended to the list.</p>
+
+<h3 class="function"><a name="open-2">open/2</a></h3>
+<div class="spec">
+<p><tt>open(State::nil | <a href="#type-cbtree">cbtree()</a>, Ref::<a href="cbt_backend.html#type-ref">cbt_backend:ref()</a>) -&gt; {ok, <a href="#type-cbtree">cbtree()</a>}</tt><br></p>
+</div><p>open a btree using the default backend cbt_file.
+  pass in 'nil' for State if a new Btree.</p>
+
+<h3 class="function"><a name="open-3">open/3</a></h3>
+<div class="spec">
+<p><tt>open(State::nil | <a href="#type-cbtree">cbtree()</a>, Ref::<a href="cbt_backend.html#type-ref">cbt_backend:ref()</a>, Options::<a href="#type-cbtree_options">cbtree_options()</a>) -&gt; {ok, <a href="#type-cbtree">cbtree()</a>}</tt><br></p>
+</div><p>open a btree . Default backend is cbt_file.
+  pass in 'nil' for State if a new Btree.
+  Options:
+  <ul>
+  <li> {backend, Module} : backend to use to read/append btree items. Default
+  is cbt_file.</li>
+  <li> {split, fun(Btree, Value)} : Take a value and extract content if
+  needed from it. It returns a {key, Value} tuple. You don't need to
+  set such function if you already give a {Key, Value} tuple to your
+  add/add_remove functions.</li>
+  <li>{join, fun(Key, Value)} : The fonction takes the key and value and
+  return a new Value ussed when you lookup. By default it return a
+  {Key, Value} .</li>
+  <li>{reduce_fun, ReduceFun} : pass the reduce fun</li>
+  <li> {compression, nonde | snappy}: the compression methods used to
+  compress the data</li>
+  <li>{less, LessFun(KeyA, KeyB)}: function used to order the btree that
+  compare two keys</li>
+  </ul></p>
+
+<h3 class="function"><a name="query_modify-4">query_modify/4</a></h3>
+<div class="spec">
+<p><tt>query_modify(Btree::<a href="#type-cbtree">cbtree()</a>, LookupKeys::<a href="#type-cbt_keys">cbt_keys()</a>, InsertKeyValues::<a href="#type-cbt_kvs">cbt_kvs()</a>, RemoveKeys::<a href="#type-cbt_keys">cbt_keys()</a>) -&gt; {ok, FoundKeyValues::<a href="#type-cbt_kvs">cbt_kvs()</a>, Btree2::<a href="#type-cbtree">cbtree()</a>}</tt><br></p>
+</div><p>insert and remove a list of key/values and retrieve a list of
+  key/values from their key in the btree in one call.</p>
+
+<h3 class="function"><a name="set_options-2">set_options/2</a></h3>
+<div class="spec">
+<p><tt>set_options(Btree::<a href="#type-cbtree">cbtree()</a>, Options::<a href="#type-cbtree_options">cbtree_options()</a>) -&gt; Btree2::<a href="#type-cbtree">cbtree()</a></tt><br></p>
+</div><p>set btreee options</p>
+
+<h3 class="function"><a name="size-1">size/1</a></h3>
+<div class="spec">
+<p><tt>size(Btree::<a href="#type-cbtree">cbtree()</a>) -&gt; Size::integer()</tt><br></p>
+</div><p>return the size in bytes of a btree</p>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc, Dec 31 2014, 17:15:26.</i></p>
+</body>
+</html>

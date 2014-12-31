@@ -1,0 +1,174 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>The cbt application</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<h1>The cbt application</h1>
+<p>Copyright © 2014 Benoit Chesneau (Apache 2 License)
+</p>
+<p><b>Version:</b> 1.1.2</p>
+<p><b>Authors:</b> Benoit Chesneau (<a href="mailto:benoitc@refuge.io"><tt>benoitc@refuge.io</tt></a>) [<em>web site:</em> <tt><a href="http://refuge.io/" target="_top">http://refuge.io/</a></tt>].</p>
+<p>cbt is a multi-layer MVCC log append-only database based on the Apache CouchDB btree.</p>
+
+
+<p>The source code can be obtained from <a href="https://bitbucket.org/refugeio/cbt">the bitbucket repo</a>.</p>
+
+<p>Included modules are:</p>
+
+<dl>
+    <dt><a href="cbt_file.html"><code>cbt_file</code></a></dt>
+    <dd>
+        File module used by other module.
+    </dd>
+
+    <dt><a href="cbt_btree.html"><code>cbt_btree</code></a></dt>
+    <dd>
+        Main module to write and query multiple btree in a file created
+with the cbt_file module.
+    </dd>
+
+    <dt><a href="cbt_stream.html"><code>cbt_stream</code></a></dt>
+    <dd>
+        module to store a large binary (stream) in the database file and
+get the list of each chunk.
+    </dd>
+
+    <dt><a href="cbt_btree_copy.html"><code>cbt_btree_copy</code></a></dt>
+    <dd>
+        module to store a btree to another.
+    </dd>
+</dl>
+
+
+<p>Example of usage:</p>
+
+<p>Store a {Key Value} pair in a btree:</p>
+
+<pre>1&gt; {ok, Fd} = cbt_file:open("test.db").
+{ok,&lt;0.35.0&gt;}
+2&gt; {ok, Btree} = cbt_btree:opeb(nil, Fd).
+{ok,{btree,&lt;0.35.0&gt;,nil,undefined,undefined,undefined,nil,
+           snappy,1279}}
+3&gt;
+3&gt; {ok, Btree2} = cbt_btree:add(Btree, [{a, 1}]).
+{ok,{btree,&lt;0.35.0&gt;,
+           {0,[],32},
+           undefined,undefined,undefined,nil,snappy,1279}}
+4&gt; Root = cbt_btree:get_state(Btree2).
+{0,[],32}
+5&gt; Header = {1, Root}.
+{1,{0,[],32}}
+6&gt; cbt_file:write_header(Fd, Header).
+ok
+```
+
+What we did here is to open a file, create a btree inside and add a key
+value. Until we write the header, the database value is not changed.
+
+Now open the database in a new process and read the btree using the last
+header:
+
+```
+7&gt; {ok, Fd1} = cbt_file:open("test.db").
+{ok,&lt;0.44.0&gt;}
+8&gt;
+8&gt; {ok, Header1} = cbt_file:read_header(Fd1).
+{ok,{1,{0,[],32}}}
+9&gt; Header1 == Header
+9&gt; .
+true
+10&gt; {_, ReaderRoot} = Header1.
+{1,{0,[],32}}
+11&gt; {ok, SnapshotBtree} = cbt_btree:open(ReaderRoot, Fd1).
+{ok,{btree,&lt;0.44.0&gt;,
+           {0,[],32},
+           undefined,undefined,undefined,nil,snappy,1279}}
+12&gt; cbt_btree:lookup(SnapshotBtree, [a]).
+[{ok,{a,1}}]
+```
+
+You can check that the database value is not change until we store the
+header:
+
+```
+13&gt; {ok, Btree4} = cbt_btree:add(Btree2, [{a, 1}, {b, 2}]).
+{ok,{btree,&lt;0.35.0&gt;,
+           {4160,[],39},
+           undefined,undefined,undefined,nil,snappy,1279}}
+14&gt; cbt_btree:lookup(Btree4, [a, b]).
+[{ok,{a,1}},{ok,{b,2}}]
+15&gt; Root2 = cbt_btree:get_state(Btree4).
+{4160,[],39}
+16&gt; Header2 = {1, Root2}.
+{1,{4160,[],39}}
+17&gt; cbt_file:write_header(Fd, Header2).
+ok
+18&gt; cbt_btree:lookup(SnapshotBtree, [a, b]).
+[{ok,{a,1}},not_found]</pre>
+
+<p>## ETS backend</p>
+
+<p>Find here a simple usage of the ETS backend of cbt allowing you to store one
+database in an ETS.</p>
+
+<pre>1&gt; cbt_ets:new(test).
+test
+2&gt; {ok, Bt} = cbt_ets:open_btree(test, test).
+{ok,{btree,test,cbt_ets,nil,identity,identity,
+           #Fun&lt;cbt_btree.1.30772535&gt;,nil,none,1279,2558}}
+3&gt; {ok, Bt2} = cbt_btree:add(Bt, [{a, 1}]).
+{ok,{btree,test,cbt_ets,
+           {1,[],28},
+           identity,identity,#Fun&lt;cbt_btree.1.30772535&gt;,nil,none,1279,
+           2558}}
+4&gt;  cbt_ets:update_btree(test, test, Bt2).
+true
+5&gt; {ok, SnapshotBtree} = cbt_ets:open_btree(test, test).
+{ok,{btree,test,cbt_ets,
+           {1,[],28},
+           identity,identity,#Fun&lt;cbt_btree.1.30772535&gt;,nil,none,1279,
+           2558}}
+6&gt; cbt_btree:lookup(SnapshotBtree, [a]).
+[{ok,{a,1}}]
+7&gt; {ok, Bt3} = cbt_btree:add(Bt2, [{b, 2}]).
+{ok,{btree,test,cbt_ets,
+           {2,[],36},
+           identity,identity,#Fun&lt;cbt_btree.1.30772535&gt;,nil,none,1279,
+           2558}}
+8&gt; cbt_ets:update_btree(test, test, Bt3).
+true
+9&gt; cbt_btree:lookup(SnapshotBtree, [a, b]).
+[{ok,{a,1}},not_found]
+10&gt; {ok, SnapshotBtree2} = cbt_ets:open_btree(test, test).
+{ok,{btree,test,cbt_ets,
+           {2,[],36},
+           identity,identity,#Fun&lt;cbt_btree.1.30772535&gt;,nil,none,1279,
+           2558}}
+11&gt; cbt_btree:lookup(SnapshotBtree2, [a, b]).
+[{ok,{a,1}},{ok,{b,2}}]</pre>
+
+<p>## Custom storage backend</p>
+
+<p>CBT provides you 2 different backends by default:</p>
+
+<p>- <code>cbt_file</code>: Backend to store data in a file
+- <code>cbt_ets</code>: Backend to store data in ETS.</p>
+
+<p>But can use a custom backends to store the btree data if you need it. For
+example if you want to store the btree in a custom file backend when you want
+to change the data types or when you want to store the BTREE over a Key/Value
+store.</p>
+
+To do it just pass the backend module to the btree and give it the Reference
+(atom or pid) that have been created when initializing the backend. Have a
+look in the <code>cbt_ets</code> module for more informations.
+
+<hr>
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc, Dec 31 2014, 17:15:26.</i></p>
+</body>
+</html>

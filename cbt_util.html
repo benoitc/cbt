@@ -1,0 +1,149 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Module cbt_util</title>
+<link rel="stylesheet" type="text/css" href="stylesheet.css" title="EDoc">
+</head>
+<body bgcolor="white">
+<div class="navbar"><a name="#navbar_top"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<hr>
+
+<h1>Module cbt_util</h1>
+<ul class="index"><li><a href="#types">Data Types</a></li><li><a href="#index">Function Index</a></li><li><a href="#functions">Function Details</a></li></ul>
+
+
+<h2><a name="types">Data Types</a></h2>
+
+<h3 class="typedecl"><a name="type-hash">hash()</a></h3>
+<p><tt>hash() = md4 | md5 | ripemd160 | sha | sha224 | sha256 | sha384 | sha512</tt></p>
+
+
+<h3 class="typedecl"><a name="type-hash_ctx">hash_ctx()</a></h3>
+<p><tt>hash_ctx() = {<a href="#type-hash">hash()</a>, binary()}</tt></p>
+
+
+<h3 class="typedecl"><a name="type-hash_data">hash_data()</a></h3>
+<p><tt>hash_data() = binary() | maybe_improper_list(binary() | maybe_improper_list(any(), binary() | []) | byte(), binary() | [])</tt></p>
+
+
+<h2><a name="index">Function Index</a></h2>
+<table width="100%" border="1" cellspacing="0" cellpadding="2" summary="function index"><tr><td valign="top"><a href="#decodeBase64Url-1">decodeBase64Url/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#encodeBase64Url-1">encodeBase64Url/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#ensure_all_started-1">ensure_all_started/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#ensure_all_started-2">ensure_all_started/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_opt-2">get_opt/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_opt-3">get_opt/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_value-2">get_value/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#get_value-3">get_value/3</a></td><td></td></tr>
+<tr><td valign="top"><a href="#implode-2">implode/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#md5-1">md5/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#md5_final-1">md5_final/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#md5_init-0">md5_init/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#md5_update-2">md5_update/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#rand32-0">rand32/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#reorder_results-2">reorder_results/2</a></td><td></td></tr>
+<tr><td valign="top"><a href="#should_flush-0">should_flush/0</a></td><td></td></tr>
+<tr><td valign="top"><a href="#should_flush-1">should_flush/1</a></td><td></td></tr>
+<tr><td valign="top"><a href="#uniqid-0">uniqid/0</a></td><td></td></tr>
+</table>
+
+<h2><a name="functions">Function Details</a></h2>
+
+<h3 class="function"><a name="decodeBase64Url-1">decodeBase64Url/1</a></h3>
+<div class="spec">
+<p><tt>decodeBase64Url(Url64) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="encodeBase64Url-1">encodeBase64Url/1</a></h3>
+<div class="spec">
+<p><tt>encodeBase64Url(Url) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="ensure_all_started-1">ensure_all_started/1</a></h3>
+<div class="spec">
+<p><tt>ensure_all_started(Application) -&gt; {ok, Started} | {error, Reason}</tt>
+<ul class="definitions"><li><tt>Application = atom()</tt></li><li><tt>Started = [atom()]</tt></li><li><tt>Reason = term()</tt></li></ul></p>
+</div>
+
+<h3 class="function"><a name="ensure_all_started-2">ensure_all_started/2</a></h3>
+<div class="spec">
+<p><tt>ensure_all_started(Application, Type) -&gt; {ok, Started} | {error, Reason}</tt>
+<ul class="definitions"><li><tt>Application = atom()</tt></li><li><tt>Type = permanent | transient | temporary</tt></li><li><tt>Started = [atom()]</tt></li><li><tt>Reason = term()</tt></li></ul></p>
+</div>
+
+<h3 class="function"><a name="get_opt-2">get_opt/2</a></h3>
+<div class="spec">
+<p><tt>get_opt(Key, Opts) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="get_opt-3">get_opt/3</a></h3>
+<div class="spec">
+<p><tt>get_opt(Key, Opts, Default) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="get_value-2">get_value/2</a></h3>
+<div class="spec">
+<p><tt>get_value(Key, List) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="get_value-3">get_value/3</a></h3>
+<div class="spec">
+<p><tt>get_value(Key, List, Default) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="implode-2">implode/2</a></h3>
+<div class="spec">
+<p><tt>implode(List, Sep) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="md5-1">md5/1</a></h3>
+<div class="spec">
+<p><tt>md5(Data::<a href="#type-hash_data">hash_data()</a>) -&gt; Digest::binary()</tt><br></p>
+</div>
+
+<h3 class="function"><a name="md5_final-1">md5_final/1</a></h3>
+<div class="spec">
+<p><tt>md5_final(Context::<a href="#type-hash_ctx">hash_ctx()</a>) -&gt; Digest::binary()</tt><br></p>
+</div>
+
+<h3 class="function"><a name="md5_init-0">md5_init/0</a></h3>
+<div class="spec">
+<p><tt>md5_init() -&gt; Context::<a href="#type-hash_ctx">hash_ctx()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="md5_update-2">md5_update/2</a></h3>
+<div class="spec">
+<p><tt>md5_update(Context::<a href="#type-hash_ctx">hash_ctx()</a>, Data::<a href="#type-hash_data">hash_data()</a>) -&gt; NewContext::<a href="#type-hash_ctx">hash_ctx()</a></tt><br></p>
+</div>
+
+<h3 class="function"><a name="rand32-0">rand32/0</a></h3>
+<div class="spec">
+<p><tt>rand32() -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="reorder_results-2">reorder_results/2</a></h3>
+<div class="spec">
+<p><tt>reorder_results(Keys, SortedResults) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="should_flush-0">should_flush/0</a></h3>
+<div class="spec">
+<p><tt>should_flush() -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="should_flush-1">should_flush/1</a></h3>
+<div class="spec">
+<p><tt>should_flush(MemThreshHold) -&gt; any()</tt></p>
+</div>
+
+<h3 class="function"><a name="uniqid-0">uniqid/0</a></h3>
+<div class="spec">
+<p><tt>uniqid() -&gt; any()</tt></p>
+</div>
+<hr>
+
+<div class="navbar"><a name="#navbar_bottom"></a><table width="100%" border="0" cellspacing="0" cellpadding="2" summary="navigation bar"><tr><td><a href="overview-summary.html" target="overviewFrame">Overview</a></td><td><a href="http://www.erlang.org/"><img src="erlang.png" align="right" border="0" alt="erlang logo"></a></td></tr></table></div>
+<p><i>Generated by EDoc, Dec 31 2014, 17:15:26.</i></p>
+</body>
+</html>
