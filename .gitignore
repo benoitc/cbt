@@ -11,6 +11,7 @@ doc/erlang.png
 doc/edoc-info
 t/*.beam
 t/temp.*
+.rebar
 .eunit
 test/temp
 test/temp/*
