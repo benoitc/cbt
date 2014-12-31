@@ -20,7 +20,8 @@
 
 -record(acc, {
     btree,
-    fd,
+    ref,
+    mod,
     before_kv_write = {fun(Item, Acc) -> {Item, Acc} end, []},
     filter = fun(_) -> true end,
     compression = ?DEFAULT_COMPRESSION,
@@ -31,7 +32,8 @@
     max_level = 1
 }).
 
--type cbt_copy_options() :: [{before_kv_write, {fun(), any()}}
+-type cbt_copy_options() :: [{backend, cbt_file | atom()}
+                            | {before_kv_write, {fun(), any()}}
                             | {filter, fun()}
                             | override
                             | {compression, cbt_compress:compression_method()}].
@@ -40,6 +42,8 @@
 %% @doc copy a btree to a cbt file process.
 %% Options are:
 %% <ul>
+%% <li> {backend, Module} : backend to use to read/append btree items. Default
+%% is cbt_file.</li>
 %% <li>`{before_kv_write, fun(Item, Acc) -> {Newttem, NewAcc} end, InitAcc}':
 %% to edit a Key/Vlaue before it's written to the new btree.</li>
 %% <li>`{filter, fun(Item) -> true | false end}', function to filter the
@@ -48,30 +52,35 @@
 %% <li>`{compression, Module}': to change the compression on the new
 %% btree.</li>
 %% </ul>
--spec copy(cbt_btree:cbtree(), cbt_file:cbt_file(), cbt_copy_options()) ->
+-spec copy(Bt :: cbt_btree:cbtree(), Ref :: cbt_backend:ref(), cbt_copy_options()) ->
     {ok, cbt_btree:cbtree_root(), any()}.
-copy(Btree, Fd, Options) ->
+copy(Btree, Ref, Options) ->
+    %% use custom backend if needed
+    Mod = proplists:get_value(backend, Options, cbt_file),
+    %% override the file
     case lists:member(override, Options) of
-    true ->
-        ok = cbt_file:truncate(Fd, 0);
-    false ->
-        ok
+        true ->
+            ok = Mod:empty(Ref);
+        false ->
+            ok
     end,
     Acc0 = #acc{btree = Btree,
-                fd = Fd,
+                ref = Ref,
+                mod = Mod,
                 kv_chunk_threshold = Btree#btree.kv_chunk_threshold,
                 kp_chunk_threshold = Btree#btree.kp_chunk_threshold},
     Acc = apply_options(Options, Acc0),
     {ok, _, #acc{cur_level = 1} = FinalAcc0} = cbt_btree:fold(
         Btree, fun fold_copy/3, Acc, []),
     {ok, CopyRootState, FinalAcc} = finish_copy(FinalAcc0),
-    ok = cbt_file:sync(Fd),
+    ok = Mod:sync(Ref),
     {_, LastUserAcc} = FinalAcc#acc.before_kv_write,
     {ok, CopyRootState, LastUserAcc}.
 
-
 apply_options([], Acc) ->
     Acc;
+apply_options([{backend, Mod} | Rest], Acc) ->
+    apply_options(Rest, Acc#acc{mod = Mod});
 apply_options([{before_kv_write, {Fun, UserAcc}} | Rest], Acc) ->
     apply_options(Rest, Acc#acc{before_kv_write = {Fun, UserAcc}});
 apply_options([{filter, Fun} | Rest], Acc) ->
@@ -108,12 +117,12 @@ before_leaf_write(#acc{before_kv_write = {Fun, UserAcc0}} = Acc, KVs) ->
     {NewKVs, Acc#acc{before_kv_write = {Fun, NewUserAcc}}}.
 
 
-write_leaf(#acc{fd = Fd, compression = Comp}, Node, Red) ->
-    {ok, Pos, Size} = cbt_file:append_term(Fd, Node, [{compression, Comp}]),
+write_leaf(#acc{ref = Ref, mod=Mod, compression = Comp}, Node, Red) ->
+    {ok, Pos, Size} = Mod:append_term(Ref, Node, [{compression, Comp}]),
     {ok, {Pos, Red, Size}}.
 
 
-write_kp_node(#acc{fd = Fd, btree = Bt, compression = Comp}, NodeList) ->
+write_kp_node(#acc{ref = Ref, mod=Mod, btree = Bt, compression = Comp}, NodeList) ->
     {ChildrenReds, ChildrenSize} = lists:foldr(
         fun({_Key, {_P, Red, Sz}}, {AccR, AccSz}) ->
             {[Red | AccR], Sz + AccSz}
@@ -124,8 +133,8 @@ write_kp_node(#acc{fd = Fd, btree = Bt, compression = Comp}, NodeList) ->
     _ ->
         cbt_btree:final_reduce(Bt, {[], ChildrenReds})
     end,
-    {ok, Pos, Size} = cbt_file:append_term(
-        Fd, {kp_node, NodeList}, [{compression, Comp}]),
+    {ok, Pos, Size} = Mod:append_term(
+        Ref, {kp_node, NodeList}, [{compression, Comp}]),
     {ok, {Pos, Red, ChildrenSize + Size}}.
 
 

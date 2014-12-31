@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(cbt_btree_tests).
+-module(cbt_ets_tests).
 
 -include_lib("include/cbt.hrl").
 -include("cbt_tests.hrl").
@@ -19,10 +19,11 @@
 
 
 setup() ->
-    {ok, Fd} = cbt_file:open(?tempfile(), [create, overwrite]),
-    {ok, Btree} = cbt_btree:open(nil, Fd, [{compression, none},
-                                             {reduce, fun reduce_fun/2}]),
-    {Fd, Btree}.
+    Ref = cbt_ets:new(test_db),
+    {ok, Btree} = cbt_ets:open_btree(Ref, test, [{backend, cbt_ets},
+                                                {compression, none},
+                                                {reduce, fun reduce_fun/2}]),
+    {Ref, Btree}.
 
 setup_kvs(_) ->
     setup().
@@ -35,18 +36,18 @@ setup_red() ->
                 _ -> {"even", [{{Key, Idx}, 1} | Acc]}
             end
         end, {"odd", []}, lists:seq(1, ?ROWS)),
-    {Fd, Btree} = setup(),
+    {Ref, Btree} = setup(),
     {ok, Btree1} = cbt_btree:add_remove(Btree, EvenOddKVs, []),
-    {Fd, Btree1}.
+    {Ref, Btree1}.
 setup_red(_) ->
     setup_red().
 
-teardown(Fd) when is_pid(Fd) ->
-    ok = cbt_file:close(Fd);
-teardown({Fd, _}) ->
-    teardown(Fd).
-teardown(_, {Fd, _}) ->
-    teardown(Fd).
+teardown(Ref) when is_atom(Ref) orelse is_reference(Ref) ->
+    cbt_ets:delete(Ref);
+teardown({Ref, _}) ->
+    cbt_ets:delete(Ref).
+teardown(_, {Ref, _}) ->
+    cbt_ets:delete(Ref).
 
 
 kvs_test_funs() ->
@@ -73,8 +74,9 @@ red_test_funs() ->
 
 
 btree_open_test_() ->
-    {ok, Fd} = cbt_file:open(?tempfile(), [create, overwrite]),
-    {ok, Btree} = cbt_btree:open(nil, Fd, [{compression, none}]),
+    cbt_ets:new(test_ets_db),
+    {ok, Btree} = cbt_ets:open_btree(test_ets_db, test_btree, [{compression, none}]),
+    cbt_ets:delete(test_ets_db),
     {
         "Ensure that created btree is really a btree record",
         ?_assert(is_record(Btree, btree))
@@ -159,8 +161,8 @@ reductions_test_() ->
     }.
 
 
-should_set_fd_correctly(_, {Fd, Btree}) ->
-    ?_assertMatch(Fd, Btree#btree.ref).
+should_set_fd_correctly(_, {Ref, Btree}) ->
+    ?_assertMatch(Ref, Btree#btree.ref).
 
 should_set_root_correctly(_, {_, Btree}) ->
     ?_assertMatch(nil, Btree#btree.root).
@@ -177,13 +179,12 @@ should_fold_over_empty_btree(_, {_, Btree}) ->
     {ok, _, EmptyRes} = cbt_btree:fold(Btree, fun(_, X) -> {ok, X+1} end, 0),
     ?_assertEqual(EmptyRes, 0).
 
-should_add_all_keys(KeyValues, {Fd, Btree}) ->
+should_add_all_keys(KeyValues, {Ref, Btree}) ->
     {ok, Btree1} = cbt_btree:add_remove(Btree, KeyValues, []),
     [
         should_return_complete_btree_on_adding_all_keys(KeyValues, Btree1),
         should_have_non_zero_size(Btree1),
-        should_have_lesser_size_than_file(Fd, Btree1),
-        should_keep_root_pointer_to_kp_node(Fd, Btree1),
+        should_keep_root_pointer_to_kp_node(Ref, Btree1),
         should_remove_all_keys(KeyValues, Btree1)
     ].
 
@@ -193,12 +194,9 @@ should_return_complete_btree_on_adding_all_keys(KeyValues, Btree) ->
 should_have_non_zero_size(Btree) ->
     ?_assert(cbt_btree:size(Btree) > 0).
 
-should_have_lesser_size_than_file(Fd, Btree) ->
-    ?_assert((cbt_btree:size(Btree) =< cbt_file:bytes(Fd))).
-
-should_keep_root_pointer_to_kp_node(Fd, Btree) ->
+should_keep_root_pointer_to_kp_node(Ref, Btree) ->
     ?_assertMatch({ok, {kp_node, _}},
-                  cbt_file:pread_term(Fd, element(1, Btree#btree.root))).
+                  cbt_ets:pread_term(Ref, element(1, Btree#btree.root))).
 
 should_remove_all_keys(KeyValues, Btree) ->
     Keys = keys(KeyValues),

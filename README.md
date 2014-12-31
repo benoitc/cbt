@@ -4,9 +4,11 @@ multi-layer MVCC log append-only database library based on the Apache CouchDB bt
 
 ## Changes compared to couchdb
 
+- Pluggable Storage backends
 - use CRC32 to check data integrity instead of MD5
 - rewrote the file init part to make it more robust
-- removed the need of an external config. Provides correct default and use erlang environment.
+- removed the need of an external config. Provides correct default and use
+  erlang environment.
 - documentation and specs
 - some syntax improvements.
 
@@ -48,7 +50,7 @@ Run the following command line:
 and open the `index.html` file in the doc folder. Or read it
 [online](http://cbt.cowdb.org).
 
-## Example of usage:
+## Example of usage with the file backend
 
 Example of usage:
 
@@ -112,8 +114,60 @@ header:
     18> cbt_btree:lookup(SnapshotBtree, [a, b]).
     [{ok,{a,1}},not_found]
 
-## contribute
 
-Open Issues and Support tickets in [Jira](https://issues.refuge.io/browse/CBT
-).
-Code is available on [bitbucket](https://bitbucket.org/refugeio/cbt).
+## ETS backend
+
+Find here a simple usage of the ETS backend of cbt allowing you to store one
+database in an ETS.
+
+    1> cbt_ets:new(test).
+    test
+    2> {ok, Bt} = cbt_ets:open_btree(test, test).
+    {ok,{btree,test,cbt_ets,nil,identity,identity,
+               #Fun<cbt_btree.1.30772535>,nil,none,1279,2558}}
+    3> {ok, Bt2} = cbt_btree:add(Bt, [{a, 1}]).
+    {ok,{btree,test,cbt_ets,
+               {1,[],28},
+               identity,identity,#Fun<cbt_btree.1.30772535>,nil,none,1279,
+               2558}}
+    4>  cbt_ets:update_btree(test, test, Bt2).
+    true
+    5> {ok, SnapshotBtree} = cbt_ets:open_btree(test, test).
+    {ok,{btree,test,cbt_ets,
+               {1,[],28},
+               identity,identity,#Fun<cbt_btree.1.30772535>,nil,none,1279,
+               2558}}
+    6> cbt_btree:lookup(SnapshotBtree, [a]).
+    [{ok,{a,1}}]
+    7> {ok, Bt3} = cbt_btree:add(Bt2, [{b, 2}]).
+    {ok,{btree,test,cbt_ets,
+               {2,[],36},
+               identity,identity,#Fun<cbt_btree.1.30772535>,nil,none,1279,
+               2558}}
+    8> cbt_ets:update_btree(test, test, Bt3).
+    true
+    9> cbt_btree:lookup(SnapshotBtree, [a, b]).
+    [{ok,{a,1}},not_found]
+    10> {ok, SnapshotBtree2} = cbt_ets:open_btree(test, test).
+    {ok,{btree,test,cbt_ets,
+               {2,[],36},
+               identity,identity,#Fun<cbt_btree.1.30772535>,nil,none,1279,
+               2558}}
+    11> cbt_btree:lookup(SnapshotBtree2, [a, b]).
+    [{ok,{a,1}},{ok,{b,2}}]i
+
+## Custom storage backend
+
+CBT provides you 2 different backends by default:
+
+- `cbt_file`: Backend to store data in a file
+- `cbt_ets`: Backend to store data in ETS.
+
+But can use a custom backends to store the btree data if you need it. For
+example if you want to store the btree in a custom file backend when you want
+to change the data types or when you want to store the BTREE over a Key/Value
+store.
+
+To do it just pass the backend module to the btree and give it the Reference
+(atom or pid) that have been created when initializing the backend. Have a
+look in the `cbt_ets' module for more informations.

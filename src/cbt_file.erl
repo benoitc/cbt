@@ -12,6 +12,7 @@
 
 -module(cbt_file).
 -behaviour(gen_server).
+-behaviour(cbt_backend).
 
 -include("cbt.hrl").
 
@@ -26,14 +27,19 @@
     open_options
 }).
 
-% public API
--export([open/1, open/2, close/1, bytes/1, sync/1, truncate/2, rename/2,
-        reopen/1]).
--export([pread_term/2, pread_iolist/2, pread_binary/2]).
+%% Punlic BTREE API
+%%
+-export([append_term/2, append_term/3,
+         pread_term/2,
+         sync/1,
+         empty/1]).
+
+% Public File API
+-export([open/1, open/2, close/1, bytes/1, truncate/2, rename/2, reopen/1]).
+-export([pread_iolist/2, pread_binary/2]).
 -export([append_binary/2, append_binary_crc32/2]).
 -export([append_raw_chunk/2, assemble_file_chunk/1, assemble_file_chunk/2]).
--export([append_term/2, append_term/3, append_term_crc32/2,
-         append_term_crc32/3]).
+-export([append_term_crc32/2, append_term_crc32/3]).
 -export([write_header/2, read_header/1]).
 -export([delete/2, delete/3, nuke_dir/2, init_delete_dir/1]).
 
@@ -152,6 +158,10 @@ assemble_file_chunk(Bin, Crc32) ->
 pread_term(Fd, Pos) ->
     {ok, Bin} = pread_binary(Fd, Pos),
     {ok, cbt_compress:decompress(Bin)}.
+
+
+empty(Fd) ->
+    truncate(Fd, 0).
 
 
 %% @doc: Reads a binrary from a file that was written with append_binary

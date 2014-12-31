@@ -29,7 +29,8 @@
 
 -type cbtree() :: #btree{}.
 -type cbtree_root() :: {integer(), list(), integer()}.
--type cbtree_options() :: [{split, fun()} | {join, fun()} | {less, fun()}
+-type cbtree_options() :: [{backend, cbt_file | atom()}
+                        | {split, fun()} | {join, fun()} | {less, fun()}
                         | {reduce, fun()}
                         | {compression, cbt_compress:compression_method()}
                         | {kv_chunk_threshold, integer()}
@@ -51,17 +52,19 @@
 -export_type([cbt_fold_options/0]).
 
 
-%% @doc open a btree from the file.
+%% @doc open a btree using the default backend cbt_file.
 %% pass in 'nil' for State if a new Btree.
--spec open(State::nil | cbtree(), Fd::cbt_file:cbt_file()) -> {ok, cbtree()}.
-open(State, Fd) ->
-    {ok, #btree{root=State, fd=Fd}}.
+-spec open(State::nil | cbtree(), Ref::cbt_backend:ref()) -> {ok, cbtree()}.
+open(State, Ref) ->
+    {ok, #btree{root=State, ref=Ref, mod=cbt_file}}.
 
 
-%% @doc open a btree from the file.
+%% @doc open a btree . Default backend is cbt_file.
 %% pass in 'nil' for State if a new Btree.
 %% Options:
 %% <ul>
+%% <li> {backend, Module} : backend to use to read/append btree items. Default
+%% is cbt_file.</li>
 %% <li> {split, fun(Btree, Value)} : Take a value and extract content if
 %% needed from it. It returns a {key, Value} tuple. You don't need to
 %% set such function if you already give a {Key, Value} tuple to your
@@ -75,10 +78,10 @@ open(State, Fd) ->
 %% <li>{less, LessFun(KeyA, KeyB)}: function used to order the btree that
 %% compare two keys</li>
 %% </ul>
--spec open(State::nil | cbtree(), Fd::cbt_file:cbt_file(),
+-spec open(State::nil | cbtree(), Ref::cbt_backend:ref(),
            Options::cbtree_options()) -> {ok, cbtree()}.
-open(State, Fd, Options) ->
-    {ok, set_options(#btree{root=State, fd=Fd}, Options)}.
+open(State, Ref, Options) ->
+    {ok, set_options(#btree{root=State, ref=Ref, mod=cbt_file}, Options)}.
 
 
 %% @doc return the latest btree root that will be stored in the database
@@ -91,6 +94,8 @@ get_state(#btree{root=Root}) ->
 -spec set_options(Btree::cbtree(), Options::cbtree_options()) -> Btree2::cbtree().
 set_options(Bt, []) ->
     Bt;
+set_options(Bt, [{backend, Mod}|Rest]) ->
+    set_options(Bt#btree{mod=Mod}, Rest);
 set_options(Bt, [{split, Extract}|Rest]) ->
     set_options(Bt#btree{extract_kv=Extract}, Rest);
 set_options(Bt, [{join, Assemble}|Rest]) ->
@@ -156,7 +161,8 @@ query_modify(Bt, LookupKeys, InsertValues, RemoveKeys) ->
                 less(Bt, A, B)
             end
         end,
-    Actions = lists:sort(SortFun, lists:append([InsertActions, RemoveActions, FetchActions])),
+    Actions = lists:sort(SortFun, lists:append([InsertActions, RemoveActions,
+                                                FetchActions])),
     {ok, KeyPointers, QueryResults} = modify_node(Bt, Root, Actions, []),
     {ok, NewRoot} = complete_root(Bt, KeyPointers),
     {ok, QueryResults, Bt#btree{root=NewRoot}}.
@@ -467,18 +473,18 @@ reduce_tree_size(kp_node, NodeSize, [{_K, {_P, _Red, Sz}} | NodeList]) ->
 
 
 
-get_node(#btree{fd = Fd}, NodePos) ->
-    {ok, {NodeType, NodeList}} = cbt_file:pread_term(Fd, NodePos),
+get_node(#btree{ref = Ref, mod = Mod}, NodePos) ->
+    {ok, {NodeType, NodeList}} = Mod:pread_term(Ref, NodePos),
     {NodeType, NodeList}.
 
-write_node(#btree{fd = Fd, compression = Comp} = Bt, NodeType, NodeList) ->
+write_node(#btree{ref = Ref, mod=Mod, compression = Comp} = Bt, NodeType, NodeList) ->
     % split up nodes into smaller sizes
     NodeListList = chunkify(Bt, NodeType, NodeList),
     % now write out each chunk and return the KeyPointer pairs for those nodes
     ResultList = [
         begin
-            {ok, Pointer, Size} = cbt_file:append_term(
-                Fd, {NodeType, ANodeList}, [{compression, Comp}]),
+            {ok, Pointer, Size} = Mod:append_term(
+                Ref, {NodeType, ANodeList}, [{compression, Comp}]),
             {LastKey, _} = lists:last(ANodeList),
             SubTreeSize = reduce_tree_size(NodeType, Size, ANodeList),
             {LastKey, {Pointer, reduce_node(Bt, NodeType, ANodeList), SubTreeSize}}

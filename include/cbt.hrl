@@ -23,7 +23,8 @@
     end).
 
 -record(btree, {
-    fd,
+    ref,
+    mod,
     root,
     extract_kv = identity,  % fun({_Key, _Value} = KV) -> KV end,,
     assemble_kv =  identity, % fun({Key, Value}) -> {Key, Value} end,
@@ -33,3 +34,15 @@
     kv_chunk_threshold =  16#4ff,
     kp_chunk_threshold = 2 * 16#4ff
 }).
+
+-record(ets_btree_meta, {key,
+                         write_loc=0}).
+
+-record(ets_btree, {name,
+                    root=nil}).
+
+-record(ets_btree_data, {pos,
+                         data}).
+
+
+-define(ETS_META_KEY, '_db_meta_').
