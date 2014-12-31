@@ -78,16 +78,16 @@ open(FilePath, Options) ->
 %%  back.
 %%  or {error, Reason}.
 -spec append_term(Fd::cbt_file(), Term::term()) ->
-    {ok, Pos::integer(), NumBytesWriiten::integer}
-    | {error, term}.
+    {ok, Pos::integer(), NumBytesWritten::integer()}
+    | {error, term()}.
 append_term(Fd, Term) ->
     append_term(Fd, Term, []).
 
 
 -spec append_term(Fd::cbt_file(), Term::term(),
                   Options::append_options()) ->
-    {ok, Pos::integer(), NumBytesWriiten::integer}
-    | {error, term}.
+    {ok, Pos::integer(), NumBytesWritten::integer()}
+    | {error, term()}.
 append_term(Fd, Term, Options) ->
     Comp = cbt_util:get_value(compression, Options, ?DEFAULT_COMPRESSION),
     append_binary(Fd, cbt_compress:compress(Term, Comp)).
@@ -96,8 +96,8 @@ append_term(Fd, Term, Options) ->
 %% @doc append an Erlang term to the end of the file and sign with an
 %% crc32 prefix.
 -spec append_term_crc32(Fd::cbt_file(), Term::term()) ->
-    {ok, Pos::integer(), NumBytesWriiten::integer}
-    | {error, term}.
+    {ok, Pos::integer(), NumBytesWritten::integer()}
+    | {error, term()}.
 append_term_crc32(Fd, Term) ->
     append_term_crc32(Fd, Term, []).
 
@@ -123,8 +123,8 @@ append_binary(Fd, Bin) ->
 %% @doc append an Erlang binary to the end of the file and sign in with
 %% crc32.
 -spec append_binary_crc32(Fd::cbt_file(), Bin::binary()) ->
-    {ok, Pos::integer(), NumBytesWriiten::integer}
-    | {error, term}.
+    {ok, Pos::integer(), NumBytesWritten::integer()}
+    | {error, term()}.
 append_binary_crc32(Fd, Bin) ->
     gen_server:call(Fd,
         {append_bin, assemble_file_chunk(Bin, erlang:crc32(Bin))}, infinity).
