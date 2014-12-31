@@ -17,7 +17,7 @@
 -type ref() :: pid() | atom().
 -export_types([ref/0]).
 
-%% @doc append an Erlang term to the backend storage.
+%% append an Erlang term to the backend storage.
 -callback append_term(Ref :: ref(), Term :: term()) ->
     {ok, Pos::any(), NumBytesWritten:: integer()}
     | {error, term()}.
@@ -26,7 +26,7 @@
     {ok, Pos::any(), NumBytesWritten:: integer()}
     | {error, term()}.
 
-%% @doc read a term from the backend storage appended with append_term
+%% read a term from the backend storage appended with append_term
 -callback pread_term(Ref :: ref(), Pos :: any()) ->
     {ok, Term::term()}
     | {error, term()}.
