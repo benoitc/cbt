@@ -40,6 +40,7 @@ dependencies.
 > following dependencies:
 > - `snappy`:  https://github.com/fdmanana/snappy-erlang-nif
 > - ` lz4`: https://github.com/krestenkrab/erlang-lz4
+>
 > And launch your application installed in the library path.
 
 ### 3. test CBT
