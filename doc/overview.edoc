@@ -1,8 +1,8 @@
 title cbt - couchdb btree library
 @author Benoit Chesneau <benoitc@refuge.io>
   [http://refuge.io/]
-@version 1.1.2
-@copyright 2014 Benoit Chesneau (Apache 2 License)
+@version 1.2.1
+@copyright 2014-2015 Benoit Chesneau (Apache 2 License)
 
 @doc cbt is a multi-layer MVCC log append-only database based on the Apache CouchDB btree.
 

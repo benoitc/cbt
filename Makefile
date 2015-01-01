@@ -27,6 +27,7 @@ doc: dev
 
 test: dev
 	${REBAR} -C rebar_dev.config eunit skip_deps=true
+
 clean:
 	@$(REBAR) clean
 	@rm -f t/*.beam t/temp.*
