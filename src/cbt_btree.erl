@@ -21,11 +21,26 @@
 -export([get_state/1]).
 -export([set_options/2]).
 -export([less/3]).
+-export([encode_node/2]).
 
 -include("cbt.hrl").
 
 -define(BTREE_KV_CHUNK_THRESHOLD, 7168).
 -define(BTREE_KP_CHUNK_THRESHOLD, 6144).
+
+
+-define(KEY_BITS,       12).
+-define(VALUE_BITS,     28).
+-define(POINTER_BITS,   48).
+-define(TREE_SIZE_BITS, 48).
+-define(RED_BITS,       16).
+
+-define(MAX_KEY_SIZE,     ((1 bsl ?KEY_BITS) - 1)).
+-define(MAX_VALUE_SIZE,   ((1 bsl ?VALUE_BITS) - 1)).
+-define(MAX_RED_SIZE,     ((1 bsl ?RED_BITS) - 1)).
+
+-define(KV_NODE_TYPE, 1).
+-define(KP_NODE_TYPE, 0).
 
 -type cbtree() :: #btree{}.
 -type cbtree_root() :: {integer(), list(), integer()}.
@@ -34,7 +49,8 @@
                         | {reduce, fun()}
                         | {compression, cbt_compress:compression_method()}
                         | {kv_chunk_threshold, integer()}
-                        | {kp_chunk_threshold, integer()}].
+                        | {kp_chunk_threshold, integer()}
+                        | {binary_mod, boolean()}].
 
 -type cbt_kv() :: {Key::any(), Val::any()}.
 -type cbt_kvs() :: [cbt_kv()].
@@ -87,6 +103,8 @@ open(State, Ref, Options) ->
 %% @doc return the latest btree root that will be stored in the database
 %% header or value
 -spec get_state(Btree::cbtree()) -> State::tuple().
+get_state(#btree{root={Pointer, Reduction, Size}, binary_mode=true}) ->
+    <<Pointer:48, Size:48, Reduction/binary>>;
 get_state(#btree{root=Root}) ->
     Root.
 
@@ -109,7 +127,13 @@ set_options(Bt, [{compression, Comp}|Rest]) ->
 set_options(Bt, [{kv_chunk_threshold, Threshold}|Rest]) ->
     set_options(Bt#btree{kv_chunk_threshold = Threshold}, Rest);
 set_options(Bt, [{kp_chunk_threshold, Threshold}|Rest]) ->
-    set_options(Bt#btree{kp_chunk_threshold = Threshold}, Rest).
+    set_options(Bt#btree{kp_chunk_threshold = Threshold}, Rest);
+set_options(#btree{root = <<Pointer:48, Size:48, Red/binary>>} = Bt,
+            [{binary_mode, true}|Rest]) ->
+    set_options(Bt#btree{root = {Pointer, Red, Size},
+                         binary_mode = true}, Rest);
+set_options(Bt, [{binary_mode, Bool}|Rest]) ->
+    set_options(Bt#btree{binary_mode = Bool}, Rest).
 
 
 %% @doc return the size in bytes of a btree
@@ -453,8 +477,8 @@ modify_node(Bt, RootPointerInfo, Actions, QueryOutput) ->
             {ok, ResultList, QueryOutput2}
     end.
 
-reduce_node(#btree{reduce=nil}, _NodeType, _NodeList) ->
-    [];
+reduce_node(#btree{reduce=nil, binary_mode = BinMode}, _NodeType, _NodeList) ->
+    if BinMode -> <<>>; true -> [] end;
 reduce_node(#btree{reduce=R}, kp_node, NodeList) ->
     R(rereduce, [element(2, Node) || {_K, Node} <- NodeList]);
 reduce_node(#btree{reduce=R, assemble_kv=identity}, kv_node, NodeList) ->
@@ -472,19 +496,87 @@ reduce_tree_size(kp_node, NodeSize, [{_K, {_P, _Red, Sz}} | NodeList]) ->
     reduce_tree_size(kp_node, NodeSize + Sz, NodeList).
 
 
+get_node(#btree{ref = Ref, mod=Mod, binary_mode=false}, NodePos) ->
+    {ok, Term} = Mod:pread_term(Ref, NodePos),
+    Term;
+get_node(#btree{ref = Ref, mod=Mod, binary_mode=true}, NodePos) ->
+    {ok, CompressedBin} = Mod:pread_binary(Ref, NodePos),
+    <<TypeInt:8, NodeBin/binary>> = cbt_compress:decompress(CompressedBin),
+    Type = type_int_to_atom(TypeInt),
+    decode_node(NodeBin, Type, []).
 
-get_node(#btree{ref = Ref, mod = Mod}, NodePos) ->
-    {ok, {NodeType, NodeList}} = Mod:pread_term(Ref, NodePos),
-    {NodeType, NodeList}.
+type_int_to_atom(?KV_NODE_TYPE) ->
+    kv_node;
+type_int_to_atom(?KP_NODE_TYPE) ->
+    kp_node.
 
-write_node(#btree{ref = Ref, mod=Mod, compression = Comp} = Bt, NodeType, NodeList) ->
+decode_node(<<>>, Type, Acc) ->
+    {Type, lists:reverse(Acc)};
+decode_node(<<SizeK:?KEY_BITS, SizeV:?VALUE_BITS,
+              K:SizeK/binary, V:SizeV/binary,
+              Rest/binary>>,
+            Type, Acc) ->
+    Val = case Type of
+          kv_node ->
+              binary:copy(V);
+          kp_node ->
+              <<Pointer:?POINTER_BITS,
+                SubtreeSize:?TREE_SIZE_BITS,
+                RedSize:?RED_BITS,
+                Reduction:RedSize/binary>> = V,
+              {Pointer, binary:copy(Reduction), SubtreeSize}
+      end,
+    decode_node(Rest, Type, [{binary:copy(K), Val} | Acc]).
+
+encode_node(kv_node, Kvs) ->
+    Bin = [encode_node_kv(K, V) || {K, V} <- Kvs],
+    [?KV_NODE_TYPE | Bin];
+encode_node(kp_node, Kvs) ->
+    KvBins = [
+        begin
+            RedSize = iolist_size(Reduction),
+            case RedSize > ?MAX_RED_SIZE of
+            true ->
+                throw({error, {reduction_too_long, Reduction}});
+            false ->
+                ok
+            end,
+            V = [
+                <<Pointer:?POINTER_BITS, SubtreeSize:?TREE_SIZE_BITS, RedSize:?RED_BITS>>,
+                Reduction
+            ],
+            encode_node_kv(K, V)
+        end
+        || {K, {Pointer, Reduction, SubtreeSize}} <- Kvs
+    ],
+   [?KP_NODE_TYPE | KvBins].
+
+encode_node_kv(K, V) ->
+    SizeK = erlang:iolist_size(K),
+    SizeV = erlang:iolist_size(V),
+    case SizeK > ?MAX_KEY_SIZE of
+    true -> throw({error, {key_too_long, K}});
+    false -> ok
+    end,
+    case SizeV > ?MAX_VALUE_SIZE of
+    true -> throw({error, {value_too_long, K, SizeV}});
+    false -> ok
+    end,
+    [<<SizeK:?KEY_BITS, SizeV:?VALUE_BITS>>, K, V].
+
+write_node(#btree{ref = Ref, binary_mode = BinMode, mod = Mod, compression=Comp} = Bt, NodeType, NodeList) ->
     % split up nodes into smaller sizes
     NodeListList = chunkify(Bt, NodeType, NodeList),
     % now write out each chunk and return the KeyPointer pairs for those nodes
     ResultList = [
         begin
-            {ok, Pointer, Size} = Mod:append_term(
-                Ref, {NodeType, ANodeList}, [{compression, Comp}]),
+            {ok, Pointer, Size} = if BinMode ->
+                Bin = encode_node(NodeType, ANodeList),
+                Mod:append_binary_crc32(Ref, cbt_compress:compress(Bin, Comp));
+            true ->
+                Mod:append_term(Ref, {NodeType, ANodeList},
+                                [{compression, Comp}])
+            end,
             {LastKey, _} = lists:last(ANodeList),
             SubTreeSize = reduce_tree_size(NodeType, Size, ANodeList),
             {LastKey, {Pointer, reduce_node(Bt, NodeType, ANodeList), SubTreeSize}}

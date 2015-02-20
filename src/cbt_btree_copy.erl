@@ -116,9 +116,13 @@ before_leaf_write(#acc{before_kv_write = {Fun, UserAcc0}} = Acc, KVs) ->
         UserAcc0, KVs),
     {NewKVs, Acc#acc{before_kv_write = {Fun, NewUserAcc}}}.
 
-
-write_leaf(#acc{ref = Ref, mod=Mod, compression = Comp}, Node, Red) ->
-    {ok, Pos, Size} = Mod:append_term(Ref, Node, [{compression, Comp}]),
+write_leaf(#acc{ref = Ref, mod=Mod, btree = Bt}, {NodeType, NodeList}, Red) ->
+    {ok, Pos, Size}  = if Bt#btree.binary_mode ->
+                              Bin = couch_btree:encode_node(NodeType, NodeList),
+                              Mod:append_binary_crc32(Ref, Bin);
+                          true ->
+                              Mod:append_term(Ref, {NodeType, NodeList})
+                       end,
     {ok, {Pos, Red, Size}}.
 
 
@@ -133,8 +137,13 @@ write_kp_node(#acc{ref = Ref, mod=Mod, btree = Bt, compression = Comp}, NodeList
     _ ->
         cbt_btree:final_reduce(Bt, {[], ChildrenReds})
     end,
-    {ok, Pos, Size} = Mod:append_term(
-        Ref, {kp_node, NodeList}, [{compression, Comp}]),
+    {ok, Pos, Size} = if Bt#btree.binary_mode ->
+            Bin = couch_btree:encode_node(kp_node, NodeList),
+            Mod:append_binary_crc32(Ref, cbt_compress:compress(Bin, Comp));
+        true ->
+
+            Mod:append_term(Ref, {kp_node, NodeList}, [{compression, Comp}])
+    end,
     {ok, {Pos, Red, ChildrenSize + Size}}.
 
 

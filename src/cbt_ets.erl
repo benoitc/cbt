@@ -25,7 +25,9 @@
 %% backend API
 %%
 -export([append_term/2, append_term/3,
+         append_binary_crc32/2,
          pread_term/2,
+         pread_binary/2,
          sync/1,
          empty/1]).
 
@@ -95,11 +97,26 @@ append_term(Tab, Term, Options) ->
     ets:insert(Tab, #ets_btree_data{pos=NewPos, data=Data}),
     {ok, NewPos, byte_size(Data)}.
 
+append_binary_crc32(Tab, Data) ->
+    NewPos = ets:update_counter(Tab, ?ETS_META_KEY,
+                                {#ets_btree_meta.write_loc, 1}),
+    ets:insert(Tab, #ets_btree_data{pos=NewPos, data=Data}),
+    {ok, NewPos, byte_size(Data)}.
+
 pread_term(Tab, Pos) ->
     case ets:lookup(Tab, Pos) of
         [] -> {missing_btree_item, Pos};
         [#ets_btree_data{data=Bin}] -> {ok, cbt_compress:decompress(Bin)}
     end.
+
+
+pread_binary(Tab, Pos) ->
+    case ets:lookup(Tab, Pos) of
+        [] -> {missing_btree_item, Pos};
+        [#ets_btree_data{data=Bin}] -> {ok, Bin}
+    end.
+
+
 
 sync(_Tab) ->
     ok.
