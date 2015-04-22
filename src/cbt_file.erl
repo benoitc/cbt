@@ -109,7 +109,7 @@ append_term_crc32(Fd, Term) ->
 
 -spec append_term_crc32(Fd::cbt_file(), Term::term(),
                       Options::append_options()) ->
-    {ok, Pos::integer(), NumBytesWriiten::integer}
+    {ok, Pos::integer(), NumBytesWritten::integer}
     | {error, term}.
 append_term_crc32(Fd, Term, Options) ->
     Comp = cbt_util:get_value(compression, Options, ?DEFAULT_COMPRESSION),
