@@ -44,7 +44,7 @@ use_compressed(_UncompressedSize, _CompressedSize) ->
 -spec compress(Bin::binary()|term(), Method::compression_method()) -> Bin::binary().
 compress(Term, snappy) ->
     Bin = ?term_to_bin(Term),
-    {ok, CompressedBin} = snappy:compress(Bin),
+    {ok, CompressedBin} = snappyer:compress(Bin),
     case use_compressed(byte_size(Bin), byte_size(CompressedBin)) of
         true ->
             <<?SNAPPY_PREFIX, CompressedBin/binary>>;
@@ -79,7 +79,7 @@ compress(Term, none) ->
 decompress(<<?NO_COMPRESSION, TermBin/binary >>) ->
     binary_to_term(TermBin);
 decompress(<<?SNAPPY_PREFIX, Rest/binary>>) ->
-    {ok, TermBin} = snappy:decompress(Rest),
+    {ok, TermBin} = snappyer:decompress(Rest),
     binary_to_term(TermBin);
 decompress(<<?GZIP_PREFIX, Rest/binary>>) ->
     TermBin = zlib:gunzip(Rest),

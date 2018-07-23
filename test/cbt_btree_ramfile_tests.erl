@@ -10,7 +10,7 @@
 % License for the specific language governing permissions and limitations under
 % the License.
 
--module(cbt_btree_tests).
+-module(cbt_btree_ramfile_tests).
 
 -include_lib("include/cbt.hrl").
 -include("cbt_tests.hrl").
@@ -19,10 +19,11 @@
 
 
 setup() ->
-    {ok, Fd} = cbt_file:open(?tempfile(), [create, overwrite]),
-    {ok, Btree} = cbt_btree:open(nil, Fd, [{compression, none},
-                                             {reduce, fun reduce_fun/2}]),
-    {Fd, Btree}.
+  {ok, Fd} = cbt_ramfile:open(?tempfile()),
+  {ok, Btree} = cbt_btree:open(nil, Fd, [{backend, cbt_ramfile},
+                                         {compression, none},
+                                         {reduce, fun reduce_fun/2}]),
+  {Fd, Btree}.
 
 setup_kvs(_) ->
     setup().

@@ -91,7 +91,7 @@ get_value(Key, List, Default) ->
 
 % returns a random integer
 rand32() ->
-    crypto:rand_uniform(0, 16#100000000).
+  rand:uniform(16#100000000).
 
 implode(List, Sep) ->
     implode(List, Sep, []).
